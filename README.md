@@ -51,7 +51,7 @@ The weights and data required in the code and the Unity project can be downloade
    - Open the MainScene.  
    -  Click the **Play** button at the top.
 
-Video display link is visible [NicheTwin3D](https://youtu.be/Nms0dX_HsIY)
+Video display link is visible [NicheTwin3D](https://youtu.be/-6mZOhoo2aQ)
 
 ## License
 This project is licensed under the BSD 3-Clause License - see the [LICENSE](./LICENSE) file for details.
