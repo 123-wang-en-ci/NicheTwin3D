@@ -1,0 +1,108 @@
+#pragma kernel ComputeGridSurface
+
+// Input cell data
+StructuredBuffer<float3> _CellPositions;
+StructuredBuffer<float> _CellExpressions;
+StructuredBuffer<float4> _CellColors;
+StructuredBuffer<int> _CellTypeIds;     // Cell types buffer
+StructuredBuffer<float> _CellScales;    // Used to skip hidden cells (scale=0)
+int _CellCount;
+
+// Grid parameters
+float _GridMinX;
+float _GridMaxX;
+float _GridMinZ;
+float _GridMaxZ;
+int _GridResolution;
+float _SmoothingRadius;
+int _MaxTypes;
+int _ViewMode; // 0=Expression, 1=CellType, 2=AI_Annotation, 3=TissueRegion, 4=ZeroShot
+
+// Output buffers (for each vertex in the grid, per type)
+RWStructuredBuffer<float> _GridHeights;
+RWStructuredBuffer<float4> _GridColors;
+
+[numthreads(8, 8, 1)]
+void ComputeGridSurface (uint3 id : SV_DispatchThreadID)
+{
+    if ((int)id.x >= _GridResolution || (int)id.y >= _GridResolution || (int)id.z >= _MaxTypes)
+        return;
+
+    int typeId = (int)id.z; // Process grid for this specific cell type ID
+
+    float tX = (float)id.x / (float)(_GridResolution - 1);
+    float tZ = (float)id.y / (float)(_GridResolution - 1);
+    
+    float posX = lerp(_GridMinX, _GridMaxX, tX);
+    float posZ = lerp(_GridMinZ, _GridMaxZ, tZ);
+
+    float sumWeight = 0.0;
+    float sumHeight = 0.0;
+    float4 sumColor = float4(0,0,0,0);
+    
+    float radiusSqr = _SmoothingRadius * _SmoothingRadius;
+    
+    // For typed views (AI_Annotation=2, TissueRegion=3, ZeroShot=4), a large surface tension fusion radius is given
+    bool isCategoryMode = (_ViewMode == 2 || _ViewMode == 3 || _ViewMode == 4);
+    if (isCategoryMode) {
+        radiusSqr *= 2.5; 
+    }
+
+    // Iterate through all cells to interpolate based on distance
+    for(int i = 0; i < _CellCount; i++) {
+        // ONLY consider cells of the current type
+        if (_CellTypeIds[i] != typeId)
+            continue;
+        
+        // Skip hidden cells (scale <= 0 means the cell is not visible in the current view)
+        if (_CellScales[i] <= 0.01)
+            continue;
+
+        float3 cellPos = _CellPositions[i];
+        
+        float dx = cellPos.x - posX;
+        float dz = cellPos.z - posZ;
+        float distSqr = dx*dx + dz*dz;
+        
+        // If distance is far greater than radius, weight is effectively 0
+        if (distSqr > radiusSqr * 4.0) continue;
+
+        float weight = exp(-distSqr / radiusSqr);
+        
+        sumWeight += weight;
+        sumHeight += _CellExpressions[i] * weight;
+        sumColor += _CellColors[i] * weight;
+    }
+
+    // Flat index across 3D dimensions
+    int index = typeId * (_GridResolution * _GridResolution) + (id.y * _GridResolution + id.x);
+
+    // Metaball / Fluid Density Smoothing
+    float densityThreshold = isCategoryMode ? 0.08 : 0.05;
+    
+    if (sumWeight > densityThreshold) {
+        float baseHeight = sumHeight / sumWeight;
+        
+        if (isCategoryMode) {
+            // The plain is forced to equal height
+            baseHeight = 0.5;
+            // A fluid-level rounded downward chamfer is produced at the edge (Bevel)
+            float bevel = smoothstep(densityThreshold, densityThreshold * 2.5, sumWeight);
+            _GridHeights[index] = baseHeight * bevel;
+            
+            float4 finalColor = sumColor / sumWeight;
+            // Fine-tune the alpha so that the clip physical fault cuts at the edge of the droplet closest to the ground
+            finalColor.a = smoothstep(densityThreshold, densityThreshold * 1.2, sumWeight);
+            _GridColors[index] = finalColor;
+        } else {
+            // Traditional imputation of gene expression
+            _GridHeights[index] = baseHeight;
+            float4 finalColor = sumColor / sumWeight;
+            finalColor.a = 1.0; 
+            _GridColors[index] = finalColor;
+        }
+    } else {
+        _GridHeights[index] = 0.0;
+        _GridColors[index] = float4(0,0,0, 0.0); // Alpha 0 = Discard
+    }
+}
