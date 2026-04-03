@@ -1,59 +1,55 @@
+# NicheTwin3D: A universal digital twin paradigm for virtual cell initiative
 
+[![Unity](https://img.shields.io/badge/Unity-2021.3%2B-blue.svg)](https://unity.com/)
+[![Python](https://img.shields.io/badge/Python-3.8%2B-green.svg)](https://www.python.org/)
+[![Model](https://img.shields.io/badge/Model-Nicheformer-orange.svg)](https://huggingface.co/datasets/www123222/NicheTwin3D)
 
-# NicheTwin3D: A digital twin framework for interactive evaluation of spatial transcriptomics models
+This system is an interactive spatial transcriptomics digital twin framework based on Unity and deep learning. It combines a high-performance 3D rendering engine with advanced AI models (Nicheformer) to provide researchers with an intuitive platform for exploring cell distribution, gene expression, cell type annotation, and tissue regional segmentation.
 
-This system is an interactive spatial transcriptomics digital twin framework based on Unity and Deep Learning. It combines a high-performance 3D rendering engine with an advanced AI model (Nicheformer) to provide researchers with an intuitive platform to explore cell distribution, gene expression, cell type annotation, and tissue region segmentation.
-<img width="1965" height="1200" alt="stitching-collage-1768993819324" src="https://github.com/123-wang-en-ci/NicheTwin3D/blob/main/Figure1.png" />
+<img src="D:\数字孪生\图片\新建文件夹\abcd.png" alt="abcd" style="zoom:40%;" />
 
+Project video explanation: [https://www.youtube.com/watch?v=-6mZOhoo2aQ&feature=youtu.be](https://www.youtube.com/watch?v=-6mZOhoo2aQ&feature=youtu.be)
 
+---
 
+## 🛠️ Installation
 
-## The main function
+### 1. Clone Repository & Environment Preparation
 
-The system integrates five core analysis modules:
-
-- **Interactive 3D View**: Render tens of thousands of cells in three-dimensional space in real time to visually display tissue structure. 
-- **Gene Expression and Imputation (Gene Imputation)**: Query the expression level of specific genes in real time, and use the AI model to interpolate sparse data to restore the true expression pattern. 
-- **Auto Annotation**: Automatically predict cell types based on the Nicheformer model and generate a visual legend.  
--  **Tissue Segmentation**: Automatically identify and segment different tissue functional areas (such as cortex, medulla, etc.), supporting independent display of single areas.  
-- **Zero-Shot Clustering**: User-defined number of clusters, potential cell subpopulations can be discovered instantly without retraining.
-
-## Quick start
-
-### 1. Environmental preparation
-
-Backend (Python):
-
-Make sure you have the Python environment installed and the necessary dependencies.
-
+```bash
+git clone https://github.com/your-username/NicheTwin3D.git
+cd NicheTwin3D
 ```
+
+### 2. Download Weights & Data (Essential Weights & Data)
+
+**⚠️ IMPORTANT**: Due to large file sizes, model weights and H5AD datasets are NOT included directly in the GitHub repository. Please download them from Hugging Face:
+
+- **Download Link**: [Hugging Face - NicheTwin3D Dataset](https://huggingface.co/datasets/www123222/NicheTwin3D/tree/main)
+- **File Placement**:
+  - Place `.h5ad` data files in the `Assets/Scripts/Server/` directory.
+  - Place `nicheformer_weights.pth` weight files in the `Assets/Scripts/Server/` directory.
+
+### 3. Python Backend Configuration
+
+```bash
+# Enter the backend directory
+cd Assets/Scripts/Server
+
+# Install dependencies
 pip install -r requirements.txt
+
+# Start the service
+python server.py
 ```
 
-The weights and data required in the code and the Unity project can be downloaded from [NicheTwin3D](https://huggingface.co/datasets/www123222/NicheTwin3D/tree/main)
+*The backend will run at `http://127.0.0.1:8000` after a successful start.*
 
-**Front-end (Unity):**
+### 4. Unity Frontend Configuration
 
-- Install Unity Hub and Unity Editor (2020.3 or higher recommended).  
-- Assign the current project's Scripts folder
-
-### 2. Running steps
-
-1. **Launch Backend Services**:
-
-   ```
-   python server.py
-   # Runs by default http://127.0.0.1:8000
-   ```
-
-2. **Start Unity client**:
-
-   - Open the project in the Unity Editor.  
-   - Open the MainScene.  
-   -  Click the **Play** button at the top.
-
-Video display link is visible [NicheTwin3D](https://youtu.be/-6mZOhoo2aQ)
+1. Directly run **NicheTwin3D.exe**.
+2. Ensure that `unity_cell_data.csv` exists in the `StreamingAssets` directory (if it is missing, run the backend and click **Sync** to generate it).
 
 ## License
-This project is licensed under the BSD 3-Clause License - see the [LICENSE](./LICENSE) file for details.
-SPDX-License-Identifier: BSD-3-Clause
+
+This project is licensed under the BSD 3-Clause License - see the [LICENSE](https://github.com/123-wang-en-ci/NicheTwin3D/blob/main/LICENSE) file for details. SPDX-License-Identifier: BSD-3-Clause
