@@ -6,7 +6,8 @@
 
 This system is an interactive spatial transcriptomics digital twin framework based on Unity and deep learning. It combines a high-performance 3D rendering engine with advanced AI models (Nicheformer) to provide researchers with an intuitive platform for exploring cell distribution, gene expression, cell type annotation, and tissue regional segmentation.
 
-<img src="D:\数字孪生\图片\新建文件夹\abcd.png" alt="abcd" style="zoom:40%;" />
+![Uploading abcd.png…]()
+
 
 Project video explanation: [https://www.youtube.com/watch?v=-6mZOhoo2aQ&feature=youtu.be](https://www.youtube.com/watch?v=-6mZOhoo2aQ&feature=youtu.be)
 
