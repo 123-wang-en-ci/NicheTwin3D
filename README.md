@@ -1,7 +1,7 @@
 # NicheTwin3D: A universal digital twin paradigm for virtual cell initiative
 
 [![Unity](https://img.shields.io/badge/Unity-2023.1%2B-blue.svg)](https://unity.com/)
-[![Python](https://img.shields.io/badge/Python-3.8%2B-green.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.9%2B-green.svg)](https://www.python.org/)
 [![Model](https://img.shields.io/badge/Model-Nicheformer-orange.svg)](https://huggingface.co/datasets/www123222/NicheTwin3D)
 
 This system is an interactive spatial transcriptomics digital twin framework based on Unity and deep learning. It combines a high-performance 3D rendering engine with advanced AI models (Nicheformer) to provide researchers with an intuitive platform for exploring cell distribution, gene expression, cell type annotation, and tissue regional segmentation.
