@@ -35,7 +35,7 @@ cd NicheTwin3D
 
 First, configure the Nicheformer model architecture by placing the Nicheformer source code inside the `NicheTwin3D-main\Server\Nicheformer` directory.
 
-Next, set up the running environment:
+Next, set up the running environment. Note that you need to create a virtual environment in Anaconda:
 
 ```bash
 # Enter the backend directory
