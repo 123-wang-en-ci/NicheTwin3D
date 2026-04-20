@@ -41,6 +41,12 @@ Next, set up the running environment:
 # Enter the backend directory
 cd Assets/Scripts/Server
 
+# Create a virtual environment
+conda create --name myenv python=3.9
+
+# Activate virtual environment
+conda activate test
+
 # Install dependencies
 pip install -r requirements.txt
 
