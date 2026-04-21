@@ -54,7 +54,7 @@ pip install -r requirements.txt
 python server.py
 ```
 
-Upon a successful startup, the backend will run at `http://127.0.0.1:8000`. Meanwhile, it will automatically generate a `unity_cell_data.csv` data file located in the `NicheTwin3D-main\Assets\StreamingAssets` directory. This data file will be required for the subsequent Unity frontend configuration. 
+After successful startup, the backend will be running at "http://127.0.0.1:8000". At the same time, it will automatically generate the "unity_cell_data.csv" data file located in the "NicheTwin3D-main\..\..\StreamingAssets\unity_cell_data.csv" directory. Please note that "..\" refers to the directory going up one level. This data file will be required for subsequent Unity frontend configuration.
 
 ### 4. Unity Frontend Configuration
 
