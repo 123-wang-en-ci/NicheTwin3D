@@ -39,7 +39,7 @@ Next, set up the running environment. Note that you need to create a virtual env
 
 ```bash
 # Enter the backend directory
-cd Assets/Scripts/Server
+In the Anaconda Prompt terminal, go to the corresponding NicheTwin3D-main\Server directory on your computer
 
 # Create a virtual environment
 conda create -n aivc python=3.9.23 -y
