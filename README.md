@@ -42,13 +42,14 @@ Next, set up the running environment. Note that you need to create a virtual env
 cd Assets/Scripts/Server
 
 # Create a virtual environment
-conda create --name myenv python=3.9
+conda create -n aivc python=3.9.23 -y
 
 # Activate virtual environment
-conda activate myenv
+conda activate aivc
 
 # Install dependencies
-pip install -r requirements.txt
+pip install torch==2.1.0+cu118 torchvision==0.16.0+cu118 torchtext==0.16.0+cpu --extra-index-url https://download.pytorch.org/whl/cu118
+conda env update -n aivc -f environment.yml
 
 # Start the service
 python server.py
