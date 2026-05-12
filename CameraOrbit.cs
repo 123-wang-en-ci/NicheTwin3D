@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class CameraOrbit : MonoBehaviour
 {
-    public Transform target; // Drag in Cell_Container (create an empty object and place it in the center of the cell)
+    public Transform target; // Drag into Cell_Container (or manually create an empty object and place it in the center of the cell)
     public float distance = 50.0f;
     public float xSpeed = 120.0f;
     public float ySpeed = 120.0f;
@@ -16,11 +16,11 @@ public class CameraOrbit : MonoBehaviour
         x = angles.y;
         y = angles.x;
 
-        // If there is no goal, create a temporary center point
+        // If there is no target, create a temporary center point
         if (target == null)
         {
             GameObject t = new GameObject("CamTarget");
-            t.transform.position = new Vector3(50, 0, 50); 
+            t.transform.position = new Vector3(50, 0, 50); // Assume that the center of your model is approximately here
             target = t.transform;
         }
     }
@@ -40,7 +40,7 @@ public class CameraOrbit : MonoBehaviour
             transform.position = position;
         }
 
-        // Scroll wheel zoom
+        //Scroll wheel zoom
         distance -= Input.GetAxis("Mouse ScrollWheel") * 10f;
     }
 }

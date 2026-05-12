@@ -8,9 +8,8 @@ using UnityEngine.UI;
 using TMPro;
 
 /// <summary>
-/// GPU Instancing version of DataLoader 
-/// 
-/// /// Uses GPU rendering instead of traditional GameObject methods, greatly improving performance
+/// GPU Instancing version of DataLoader
+/// Use GPU rendering to replace the traditional GameObject method, greatly improving performance
 /// </summary>
 public class DataLoaderGPU : MonoBehaviour
 {
@@ -27,7 +26,7 @@ public class DataLoaderGPU : MonoBehaviour
     public GameObject legendPanel;
     public GameObject legendItemPrefab;
     public Transform legendContent;
-    public GameObject toggleSurfaceButtonObj; // UI button to toggle render mode
+    public GameObject toggleSurfaceButtonObj; // New: UI button to switch rendering mode
 
     [Header("Region Filter")]
     public TMP_Dropdown regionDropdown;
@@ -36,7 +35,7 @@ public class DataLoaderGPU : MonoBehaviour
     private List<string> currentRegionNames = new List<string>();
     private List<int> savedRegionIds = new List<int>();
 
-    //     Use GPURenderer's ViewMode enumeration to maintain consistency
+    // Use GPURenderer's ViewMode enumeration for consistency
     public GPURenderer.ViewMode currentMode = GPURenderer.ViewMode.Expression;
     private bool currentIsImputation = false;
 
@@ -56,7 +55,8 @@ public class DataLoaderGPU : MonoBehaviour
         public string id;
         public float x;
         public float y;
-        public float expression;
+        public float expression; // used for height and color rendering (normalized values)
+public float rawExpression; // used for UI panel display (real value)
         public int typeId;
         public string typeName;
     }
@@ -76,7 +76,7 @@ public class DataLoaderGPU : MonoBehaviour
             }
         }
         
-        // Make sure that Proxy Manager exists
+        // Make sure the Proxy Manager exists
         if (proxyManager == null)
         {
             GameObject proxyObj = new GameObject("Proxy_Manager");
@@ -125,6 +125,7 @@ public class DataLoaderGPU : MonoBehaviour
                 data.x = float.Parse(values[1], CultureInfo.InvariantCulture);
                 data.y = float.Parse(values[2], CultureInfo.InvariantCulture);
                 data.expression = float.Parse(values[4], CultureInfo.InvariantCulture);
+                data.rawExpression = data.expression; // The real value is equal to the current value during initialization
                 data.typeId = int.Parse(values[5]);
                 if (values.Length > 6) data.typeName = values[6];
 
@@ -151,7 +152,7 @@ public class DataLoaderGPU : MonoBehaviour
         {
             var cell = cells[i];
             
-            // Calculate the initial position
+            // Calculate initial position
             Vector3 pos = new Vector3(
                 cell.x * gpuRenderer.positionScale,
                 cell.expression * gpuRenderer.heightMultiplier,
@@ -177,13 +178,13 @@ public class DataLoaderGPU : MonoBehaviour
             initialPositions.Add(pos);
         }
 
-        //Initialize the GPU Renderer
+        //Initialize GPU Renderer
         if (gpuRenderer != null)
         {
             gpuRenderer.InitializeData(gpuDataList, idToIndexMap, cellIdList);
         }
 
-        // Initialize the agent Collider system
+        //Initialize the agent Collider system
         if (proxyManager != null)
         {
             proxyManager.InitializeProxies(gpuRenderer, cellIdList, initialPositions);
@@ -205,15 +206,15 @@ public class DataLoaderGPU : MonoBehaviour
         {
             case GPURenderer.ViewMode.Expression:
                 targetValue = cell.expression;
-                // Data traceability: If there is an open coverage and the cells are high-expression cells interpolated from very low expression (<=0.01).
+                // Data traceability: If coverage is turned on and the cells are high-expression cells interpolated from extremely low expression levels (<=0.01)
                 if (currentIsImputation && gpuRenderer != null && gpuRenderer.enableImputedColorOverride && isImputedMap.ContainsKey(cell.id) && isImputedMap[cell.id])
                 {
-                    // Force dyeing to a specified monochrome gradient, preserving intensity mapping
+                    //Force dye to the specified single color gradient, retaining the intensity mapping
                     baseColor = Color.Lerp(Color.black, gpuRenderer.imputedCellColor, cell.expression);
                 }
                 else
                 {
-                    // The original ecology is gradient with a standard red and blue thermometer
+                    // Original ecological use of standard red and blue thermometer gradient
                     baseColor = gpuRenderer.colorGradient.Evaluate(cell.expression);
                 }
                 scale = 0.5f;
@@ -273,7 +274,7 @@ public class DataLoaderGPU : MonoBehaviour
             case GPURenderer.ViewMode.TissueRegion:
                 targetValue = 0.5f;
                 scale = 0.8f;
-                // The region color is handled in ApplyRegionSegmentation
+                //Region color is processed in ApplyRegionSegmentation
                 break;
         }
 
@@ -283,13 +284,13 @@ public class DataLoaderGPU : MonoBehaviour
             cell.y * gpuRenderer.positionScale
         );
 
-        // The region color is handled in ApplyRegionSegmentation
+        //Update GPU Renderer
         if (gpuRenderer != null)
         {
             gpuRenderer.UpdateCellVisual(cellId, targetPos, baseColor, scale, cell.expression);
         }
 
-        // Flag needs to update agent location
+        // Mark the need to update the proxy location
         if (markProxyUpdate && proxyManager != null)
         {
             proxyManager.MarkForUpdate();
@@ -297,7 +298,7 @@ public class DataLoaderGPU : MonoBehaviour
     }
 
     [System.Serializable]
-    public class UpdateData { public string id; public float new_expr; }
+    public class UpdateData { public string id; public float new_expr; public float raw_expr; }
 
     [System.Serializable]
     public class ServerResponse
@@ -318,7 +319,7 @@ public class DataLoaderGPU : MonoBehaviour
             currentIsImputation = response.message.Contains("Imputation") || response.message.Contains("Denoise");
         }
         
-        // If the query is new (non-imputed), reset the traceability cache
+        // If it is a new query (non-interpolation), reset the traceability cache library
         if (!currentIsImputation)
         {
             originalExpressionMap.Clear();
@@ -333,32 +334,33 @@ public class DataLoaderGPU : MonoBehaviour
                 
                 if (!currentIsImputation)
                 {
-                    // Preserve first-hand wild sequencing concentrations
+                    //Save the first-hand wild sequencing concentration
                     originalExpressionMap[update.id] = update.new_expr;
                     isImputedMap[update.id] = false;
                 }
                 else
                 {
-                    //  Imputation update: Compare the native concentration
+                    // Interpolation update: compare native concentration
                     float origExpr = originalExpressionMap.ContainsKey(update.id) ? originalExpressionMap[update.id] : 0f;
-                    //  Definition: Cells that are native to less than 0.01 and exceed 0.01 after imputation are judged to be cells transformed by pure algorithms!
+                    // Definition: Cells that are originally lower than 0.01 and exceed 0.01 after interpolation are determined to be cells transformed by pure algorithms!
                     isImputedMap[update.id] = (origExpr <= 0.01f && update.new_expr > 0.01f);
                 }
                 
                 data.expression = update.new_expr;
+                data.rawExpression = update.raw_expr; // Get the real value from the backend
                 currentDataMap[update.id] = data;
 
                 UpdateObjectVisuals(update.id, false);
             }
         }
         
-        // Updated graphics card rendering mode
+        //Update graphics card rendering mode
         if (gpuRenderer != null && currentMode == GPURenderer.ViewMode.Expression)
         {
-            // If it is false, it will be reset back to false to display the ball again
+            // If it is false, it will be reset back to false and the ball will be displayed again
             gpuRenderer.showSurfaceMode = currentIsImputation;
             
-            // If true, in addition to displaying the surface, the interpolation mesh needs to be updated
+            // If true, in addition to displaying the surface, the interpolation grid also needs to be updated
             if (currentIsImputation)
             {
                 gpuRenderer.ComputeSurfaceInterpolation();
@@ -370,7 +372,7 @@ public class DataLoaderGPU : MonoBehaviour
             }
         }
 
-        // Bulk update agent locations
+        // Batch update agent locations
         if (proxyManager != null)
         {
             proxyManager.UpdateProxiesImmediate();
@@ -506,7 +508,7 @@ public class DataLoaderGPU : MonoBehaviour
 
     void RefreshAllCells()
     {
-        // Build data mappings
+        //Build data mapping
         Dictionary<string, float> expressionMap = new Dictionary<string, float>();
         Dictionary<string, int> typeMap = new Dictionary<string, int>();
 
@@ -516,7 +518,7 @@ public class DataLoaderGPU : MonoBehaviour
             typeMap[kvp.Key] = kvp.Value.typeId;
         }
 
-        // Use the GPU Renderer's batch update method
+        //Use the batch update method of GPU Renderer
         if (gpuRenderer != null)
         {
             gpuRenderer.RefreshAllCells(
@@ -528,13 +530,13 @@ public class DataLoaderGPU : MonoBehaviour
                 zeroShotColorMap,
                 highlightedTypeID,
                 highlightedRegionID, // Make sure this variable is updated correctly in FilterRegions
-                this.regionMap,     
+                this.regionMap, // <--- [Key modification]: Pass in the member variables of the class instead of null
                 currentIsImputation,
                 this.isImputedMap
             );
         }
 
-        // Update agent location
+        //Update agent location
         if (proxyManager != null)
         {
             proxyManager.UpdateProxiesImmediate();
@@ -547,7 +549,7 @@ public class DataLoaderGPU : MonoBehaviour
             CellData data = currentDataMap[id];
             typeName = string.IsNullOrEmpty(data.typeName) ? "Unknown" : data.typeName;
             pos = new Vector2(data.x, data.y);
-            expr = data.expression;
+            expr = data.rawExpression; // UI panel always displays the real value
             return true;
         }
         typeName = "Unknown"; pos = Vector2.zero; expr = 0;
@@ -669,7 +671,7 @@ public class DataLoaderGPU : MonoBehaviour
         currentMode = GPURenderer.ViewMode.TissueRegion;
         Debug.Log($"[DataLoader GPU] Applying region segmentation: {regionIds.Count} regions");
 
-        // 1. Empty and repopulate the class member variable regionMap
+        // 1. Clear and refill the class member variable regionMap
         this.regionMap.Clear();
         List<string> cellIdList = new List<string>(currentDataMap.Keys);
 
@@ -678,12 +680,12 @@ public class DataLoaderGPU : MonoBehaviour
             this.regionMap[cellIdList[i]] = regionIds[i];
         }
 
-        // 2.  Initialize Dropdown
+        // 2. Initialize Dropdown
         currentRegionNames = regionNames;
         savedRegionIds = regionIds;
         InitRegionDropdown(regionNames);
 
-        // 3.Show all by default (-1)
+        // 3. Display all by default (-1)
         highlightedRegionID = -1;
 
         if (regionNames != null && regionNames.Count > 0)
@@ -691,15 +693,15 @@ public class DataLoaderGPU : MonoBehaviour
             LegendItem[] legendData = new LegendItem[regionNames.Count];
             for (int i = 0; i < regionNames.Count; i++)
             {
-                // Create legend data with IDs of 0, 1, 2:
+                //Create legend data, ID corresponds to 0, 1, 2...
                 legendData[i] = new LegendItem { id = i, name = regionNames[i] };
             }
-            // Call the Create Legend panel
+//Call to create legend panel
             CreateLegendPanel(legendData);
         }
         else
         {
-            // If there is no name, only ID, try to generate a generic legend as well
+            // If there is no name, only ID, also try to generate a general legend
             int maxId = 0;
             foreach (var id in savedRegionIds) if (id > maxId) maxId = id;
 
@@ -714,7 +716,7 @@ public class DataLoaderGPU : MonoBehaviour
         if (toggleSurfaceButtonObj != null)
         {
             toggleSurfaceButtonObj.SetActive(true);
-            if (gpuRenderer != null) gpuRenderer.showSurfaceMode = false; // Spheres are displayed by default
+            if (gpuRenderer != null) gpuRenderer.showSurfaceMode = false; // Display sphere by default
         }
 
         // 4. Refresh the view
@@ -727,31 +729,31 @@ public class DataLoaderGPU : MonoBehaviour
         regionDropdown.ClearOptions();
         List<string> options = new List<string> { "Show All" };
 
-        // If the backend has a name, use the name, and if not, use Region 0, Region 1...
+// If the backend has a name, use the name. If not, use Region 0, Region 1...
         if (names != null && names.Count > 0)
         {
             options.AddRange(names);
         }
         else
         {
-            // If names are empty, the ID name is automatically generated
+            // If names is empty, automatically generate ID names
             int maxId = 0;
             foreach (var id in savedRegionIds) if (id > maxId) maxId = id;
             for (int i = 0; i <= maxId; i++) options.Add($"Region {i}");
         }
 
         regionDropdown.AddOptions(options);
-        regionDropdown.value = 0; // Show All is selected by default
+        regionDropdown.value = 0; // Show All selected by default
         regionDropdown.onValueChanged.RemoveAllListeners();
         regionDropdown.onValueChanged.AddListener(OnDropdownValueChanged);
     }
 
-
+// [Modification 4]: Modify the Dropdown callback logic and imitate the processing method of CellType
     private void OnDropdownValueChanged(int index)
     {
-        // index 0 is "Show All" (-1) 
-        // index 1 is "Region 0" (0) 
-        // so targetId = index - 1
+        // index 0 is "Show All" (-1)
+        // index 1 is "Region 0" (0)
+        // So targetId = index - 1
         int targetRegionId = index - 1;
 
         FilterRegions(targetRegionId);
@@ -759,18 +761,18 @@ public class DataLoaderGPU : MonoBehaviour
 
     public void FilterRegions(int targetRegionId)
     {
-        // 1. Update the Highlight ID status
+        // 1. Update highlighted ID status
         this.highlightedRegionID = targetRegionId;
 
-        // 2. If it is not currently in regional mode, force toggle
+        // 2. If the current mode is not regional mode, force the switch
         if (currentMode != GPURenderer.ViewMode.TissueRegion)
         {
             currentMode = GPURenderer.ViewMode.TissueRegion;
         }
 
-        Debug.Log($"[DataLoader GPU] 切换区域显示: {(targetRegionId == -1 ? "ALL" : targetRegionId.ToString())}");
+        Debug.Log($"[DataLoader GPU] Switch region display: {(targetRegionId == -1 ? "ALL" : targetRegionId.ToString())}");
 
-        // 3.RefreshAllCells is called to let the GPU handle the visibility
+        // 3. Core: Call RefreshAllCells to let the GPU handle display and concealment
         RefreshAllCells();
     }
 }

@@ -2,14 +2,14 @@ using UnityEngine;
 using System.Collections.Generic;
 
 /// <summary>
-/// Agent Collider Manager - Interaction Detection for GPU Instancing Rendering 
-/// Create lightweight invisible GameObject, only for Physics Raycast detection
+/// Agent Collider Manager - Interaction detection for GPU Instancing rendering
+/// Create a lightweight invisible GameObject, only used for Physics Raycast detection
 /// </summary>
 public class CellProxyManager : MonoBehaviour
 {
     [Header("Proxy Settings")]
-    public GameObject proxyPrefab; // Lightweight Prefab with Collider (not visible)
-    public float proxyUpdateInterval = 0.1f; // Agent location update interval (seconds)
+    public GameObject proxyPrefab; // Lightweight Prefab containing Collider (invisible)
+    public float proxyUpdateInterval = 0.1f; // proxy location update interval (seconds)
     
     private Dictionary<string, GameObject> proxyMap = new Dictionary<string, GameObject>();
     private GPURenderer gpuRenderer;
@@ -27,7 +27,7 @@ public class CellProxyManager : MonoBehaviour
     
     void Update()
     {
-        // Regularly update proxy locations (reduce CPU overhead)
+        // Update agent location regularly (reduces CPU overhead)
         if (Time.time - lastUpdateTime >= proxyUpdateInterval && needsUpdate)
         {
             UpdateProxyPositions();
@@ -42,18 +42,18 @@ public class CellProxyManager : MonoBehaviour
         SphereCollider collider = defaultPrefab.AddComponent<SphereCollider>();
         collider.radius = 0.5f;
         
-        // Set to Invisible
+        // Set to invisible
         MeshRenderer mr = defaultPrefab.AddComponent<MeshRenderer>();
         if (mr != null)
         {
-            mr.enabled = false; // Disable rendering
+mr.enabled = false; // Disable rendering
         }
         
         proxyPrefab = defaultPrefab;
     }
     
     /// <summary>
-    /// Initializing the Agent System
+    /// Initialize the proxy system
     /// </summary>
     public void InitializeProxies(GPURenderer renderer, List<string> cellIds, List<Vector3> initialPositions)
     {
@@ -62,7 +62,7 @@ public class CellProxyManager : MonoBehaviour
         // Clean up old proxies
         ClearAllProxies();
         
-        // Create new agent
+        //Create new proxy
         GameObject proxyContainer = new GameObject("ProxyContainer");
         proxyContainer.transform.SetParent(transform);
         
@@ -72,7 +72,7 @@ public class CellProxyManager : MonoBehaviour
             Vector3 pos = initialPositions[i];
             
             GameObject proxy = Instantiate(proxyPrefab, proxyContainer.transform);
-            proxy.name = cellId; // Use the cell ID as the name for easy identification
+            proxy.name = cellId; // Use cell ID as name for easy identification
             proxy.transform.position = pos;
             proxy.SetActive(true);
             
@@ -84,7 +84,7 @@ public class CellProxyManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Updates the position of all agents (obtained from GPU Renderer)
+    /// Update the positions of all agents (obtained from GPU Renderer)
     /// </summary>
     public void UpdateProxyPositions()
     {
@@ -96,7 +96,7 @@ public class CellProxyManager : MonoBehaviour
             string cellId = kvp.Key;
             GameObject proxy = kvp.Value;
             
-            // Get the location from the GPU Renderer
+            // Get position from GPU Renderer
             int index;
             if (gpuRenderer.TryGetCellIndex(cellId, out index))
             {
@@ -113,7 +113,7 @@ public class CellProxyManager : MonoBehaviour
     }
     
     /// <summary>
-    /// The tag requires an update to the agent location
+    /// Mark the need to update the proxy location
     /// </summary>
     public void MarkForUpdate()
     {
@@ -121,7 +121,7 @@ public class CellProxyManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Update proxy locations instantly (no waiting for intervals)
+    /// Update agent location immediately (no waiting interval)
     /// </summary>
     public void UpdateProxiesImmediate()
     {
@@ -130,7 +130,7 @@ public class CellProxyManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Update individual agent locations
+    /// Update a single agent location
     /// </summary>
     public void UpdateProxyPosition(string cellId, Vector3 position)
     {
@@ -141,7 +141,7 @@ public class CellProxyManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Set up proxy visibility (for filtering)
+    /// Set proxy visibility (for filtering)
     /// </summary>
     public void SetProxyVisibility(string cellId, bool visible)
     {
@@ -152,7 +152,7 @@ public class CellProxyManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Set up proxy visibility in bulk
+    /// Set proxy visibility in batches
     /// </summary>
     public void SetProxiesVisibility(List<string> cellIds, bool visible)
     {
@@ -163,7 +163,7 @@ public class CellProxyManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Set up all agent visibility
+    ///Set all proxy visibility
     /// </summary>
     public void SetAllProxiesVisibility(bool visible)
     {
@@ -174,7 +174,7 @@ public class CellProxyManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Clean up all proxies
+/// Clean up all proxies
     /// </summary>
     public void ClearAllProxies()
     {
@@ -187,7 +187,7 @@ public class CellProxyManager : MonoBehaviour
         }
         proxyMap.Clear();
         
-        // Clean the container
+        // Clean up the container
         Transform container = transform.Find("ProxyContainer");
         if (container != null)
         {
@@ -196,7 +196,7 @@ public class CellProxyManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Get proxy GameObject (for external access)
+    /// Get the proxy GameObject (for external access)
     /// </summary>
     public GameObject GetProxy(string cellId)
     {

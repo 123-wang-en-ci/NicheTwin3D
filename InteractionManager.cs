@@ -5,13 +5,12 @@ using System.Text;
 using UnityEngine.UI;
 using System.Collections.Generic;
 
-
 [System.Serializable]
 public class PerturbRequest
 {
     public string target_id;
-    public string perturb_type; // "KO" or "OE"
-    public string target_gene;  // "TP53"
+    public string perturb_type; 
+    public string target_gene;  
 }
 
 
@@ -19,8 +18,9 @@ public class PerturbRequest
 public class GeneRequest
 {
     public string gene_name;
-    public bool use_imputation;
+    public bool use_imputation; 
 }
+
 
 [System.Serializable]
 public class RegionResponse
@@ -34,23 +34,27 @@ public class InteractionManager : MonoBehaviour
     public string serverUrl = "http://127.0.0.1:8000/perturb"; 
     [Tooltip("Drag DataLoaderGPU here. (GPU Instancing version)")]
     public DataLoaderGPU dataLoader;
-    public Camera mainCamera;    
+    public Camera mainCamera;   
 
     public enum InteractionMode { Inspect, Perturb }
     public InteractionMode currentMode = InteractionMode.Inspect;
 
+    [Header("ģʽ��ť")]
     public Image btnInspectImg;
     public Image btnPerturbImg;
     public Color activeColor = Color.green;
     public Color inactiveColor = Color.white;
+
 
     public TMPro.TMP_InputField perturbGeneInput;
     public Toggle toggleKO;
 
     private string lastSearchedGene = "RESET";
 
-    public TMPro.TMP_Dropdown typeDropdown;
+
+    public TMPro.TMP_Dropdown typeDropdown; 
     public TMPro.TMP_InputField clusterCountInput; 
+
     private bool HasDataLoader => dataLoader != null;
 
     private bool TryGetCellDetails(string id, out string typeName, out Vector2 pos, out float expr)
@@ -115,7 +119,7 @@ public class InteractionManager : MonoBehaviour
 
     public void RequestImputation()
     {
-       if (string.IsNullOrEmpty(lastSearchedGene) || lastSearchedGene == "RESET")
+        if (string.IsNullOrEmpty(lastSearchedGene) || lastSearchedGene == "RESET")
         {
             if (UIManager.Instance != null)
                 UIManager.Instance.ShowSystemMessage("Please search a specific gene first.", true);
@@ -123,6 +127,7 @@ public class InteractionManager : MonoBehaviour
         }
 
         Debug.Log($"[UI] Requesting Single Gene Imputation for: {lastSearchedGene}");
+
         StartCoroutine(SendGeneSwitchRequest(lastSearchedGene, true));
     }
 
@@ -153,7 +158,9 @@ public class InteractionManager : MonoBehaviour
 
         if (request.result == UnityWebRequest.Result.Success)
         {
+
             string jsonString = request.downloadHandler.text;
+
             DataLoaderGPU.ServerResponse response = JsonUtility.FromJson<DataLoaderGPU.ServerResponse>(jsonString);
 
             string msg = string.IsNullOrEmpty(response.message) ? "Imputation Saved!" : response.message;
@@ -214,10 +221,12 @@ public class InteractionManager : MonoBehaviour
         }
     }
 
+
     public void RequestGeneSwitch(string geneName)
     {
         StartCoroutine(SendGeneSwitchRequest(geneName, false));
     }
+
 
     public void RequestDisableImputation()
     {
@@ -365,6 +374,67 @@ public class InteractionManager : MonoBehaviour
         {
             HandleClick();
         }
+
+        //Add screenshot function shortcut key (press F12 key to take screenshot)
+        if (Input.GetKeyDown(KeyCode.F12))
+        {
+            CaptureScreenshot();
+        }
+    }
+
+    // Export the current status as a picture (screenshot function - no UI)
+    public void CaptureScreenshot()
+    {
+        StartCoroutine(CaptureScreenshotWithoutUI());
+    }
+
+    private System.Collections.IEnumerator CaptureScreenshotWithoutUI()
+    {
+        // 1. Find all Canvas and hide them temporarily
+        Canvas[] canvases = FindObjectsOfType<Canvas>();
+        bool[] canvasStates = new bool[canvases.Length];
+        for (int i = 0; i < canvases.Length; i++)
+        {
+            canvasStates[i] = canvases[i].enabled;
+            canvases[i].enabled = false;
+        }
+
+        // 2. Wait for all cameras and images of this frame to be rendered.
+        yield return new WaitForEndOfFrame();
+
+        // 3. Capture screen pixels
+        string timestamp = System.DateTime.Now.ToString("yyyyMMdd_HHmmss");
+        string filename = $"Screenshot_{timestamp}.png";
+        
+        // Construct the absolute path under StreamingAssets
+        string saveDir = Application.streamingAssetsPath;
+        if (!System.IO.Directory.Exists(saveDir))
+        {
+            System.IO.Directory.CreateDirectory(saveDir);
+        }
+        string savePath = System.IO.Path.Combine(saveDir, filename);
+        
+        Texture2D screenShot = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
+        screenShot.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
+        screenShot.Apply();
+        
+        //Save as PNG file
+        byte[] bytes = screenShot.EncodeToPNG();
+Destroy(screenShot); // Release memory
+        System.IO.File.WriteAllBytes(savePath, bytes);
+
+        // 4. Restore the display of Canvas
+        for (int i = 0; i < canvases.Length; i++)
+        {
+            canvases[i].enabled = canvasStates[i];
+        }
+
+        // 5. Prompt the user (the UI has been restored at this time and the prompt can be displayed normally)
+        if (UIManager.Instance != null)
+        {
+            UIManager.Instance.ShowSystemMessage($"Image exported: {filename}", false);
+        }
+        Debug.Log($"[InteractionManager] Screenshot saved without UI: {savePath}");
     }
 
     void HandleClick()
@@ -394,6 +464,7 @@ public class InteractionManager : MonoBehaviour
             }
         }
     }
+
     public void RequestAnnotation()
     {
         StartCoroutine(SendAnnotationRequest());
@@ -419,11 +490,14 @@ public class InteractionManager : MonoBehaviour
             {
                 typeDropdown.gameObject.SetActive(true); 
                 typeDropdown.ClearOptions();
+
                 System.Collections.Generic.List<string> options = new System.Collections.Generic.List<string>();
                 options.Add("Show All Types");
-                options.AddRange(GetAnnotationLegend());
+                options.AddRange(GetAnnotationLegend()); 
+
                 typeDropdown.AddOptions(options);
-                typeDropdown.value = 0;                 typeDropdown.onValueChanged.RemoveAllListeners();
+                typeDropdown.value = 0; 
+                typeDropdown.onValueChanged.RemoveAllListeners();
                 typeDropdown.onValueChanged.AddListener(OnTypeDropdownChanged);
             }
 
@@ -438,16 +512,20 @@ public class InteractionManager : MonoBehaviour
         }
     }
 
+
     public void OnTypeDropdownChanged(int index)
     {
+
         int typeId = index - 1;
 
+        Debug.Log($"�л���������: {typeId}");
         if (HasDataLoader)
         {
             SetHighlightedType(typeId);
-            SwitchModeToAIAnnotation();
+            SwitchModeToAIAnnotation(); 
         }
     }
+
 
     public void RequestSaveAnnotation()
     {
@@ -456,6 +534,7 @@ public class InteractionManager : MonoBehaviour
 
     IEnumerator SendSaveAnnotationRequest()
     {
+
         UnityWebRequest request = new UnityWebRequest(serverUrl.Replace("/perturb", "/save_annotation"), "POST");
         request.downloadHandler = new DownloadHandlerBuffer();
 
@@ -507,9 +586,10 @@ public class InteractionManager : MonoBehaviour
         }
         else
         {
-            Debug.LogError(request.error);
+            Debug.LogError( request.error);
         }
     }
+
 
     public void OnSaveRegionBtnClick()
     {
@@ -532,11 +612,12 @@ public class InteractionManager : MonoBehaviour
                 var res = JsonUtility.FromJson<CommonResponse>(request.downloadHandler.text);
                 if (UIManager.Instance != null)
                     UIManager.Instance.ShowSystemMessage("Save to" + res.message, false);
-                Debug.Log($"<color=green></color> {res.message}");
+                Debug.Log($"<color=green>[�ɹ�]</color> {res.message}");
+
             }
             else
             {
-                Debug.LogError($"{request.error}");
+                Debug.LogError($"[ʧ��] �����������: {request.error}");
             }
         }
         
@@ -554,9 +635,12 @@ public class InteractionManager : MonoBehaviour
             if (!int.TryParse(clusterCountInput.text, out k))
             {
                 k = 10; 
+                Debug.LogWarning("��Ч�����룬ʹ��Ĭ��ֵ 10");
             }
         }
-            k = Mathf.Clamp(k, 2, 50);
+        Debug.Log($"�û�����{k}");
+
+        k = Mathf.Clamp(k, 2, 50);
 
         StartCoroutine(SendClusteringRequest(k));
     }
@@ -568,6 +652,8 @@ public class InteractionManager : MonoBehaviour
 
         ClusteringRequest req = new ClusteringRequest { n_clusters = k };
         string json = JsonUtility.ToJson(req);
+
+
         string url = serverUrl.Replace("/perturb", "/zero_shot_cluster");
         UnityWebRequest request = new UnityWebRequest(url, "POST");
         byte[] bodyRaw = Encoding.UTF8.GetBytes(json);
@@ -581,14 +667,17 @@ public class InteractionManager : MonoBehaviour
         if (request.result == UnityWebRequest.Result.Success)
         {
             string responseJson = request.downloadHandler.text;
-            Debug.Log("Clustering Response: " + responseJson); 
+            Debug.Log("Clustering Response: " + responseJson);
+
+
             ClusteringResponse response = JsonUtility.FromJson<ClusteringResponse>(responseJson);
 
             if (response.status == "success")
             {
+                
                 if (dataLoader != null)
                 {
-                   if (response.clusters != null && response.clusters.Count > 0)
+                    if (response.clusters != null && response.clusters.Count > 0)
                     {
                         if (response.updates != null)
                         {
@@ -596,7 +685,7 @@ public class InteractionManager : MonoBehaviour
                         }
                         else
                         {
-                            
+                            Debug.LogError("");
                         }
                     }
                     else if (response.updates != null)
@@ -623,6 +712,7 @@ public class InteractionManager : MonoBehaviour
     }
 
 
+
     public void RequestSaveClustering()
     {
         StartCoroutine(SendSaveClusteringRequest());
@@ -635,8 +725,10 @@ public class InteractionManager : MonoBehaviour
 
         string url = serverUrl.Replace("/perturb", "/save_zero_shot");
 
+
         UnityWebRequest request = new UnityWebRequest(url, "POST");
         request.downloadHandler = new DownloadHandlerBuffer();
+
 
         byte[] bodyRaw = Encoding.UTF8.GetBytes("{}");
         request.uploadHandler = new UploadHandlerRaw(bodyRaw);
@@ -683,13 +775,13 @@ public class ClusterLegendItem
     public string color; 
 }
 
-
 [System.Serializable]
 public class ClusterUpdateItem
 {
     public string id;
     public int cluster_id;
 }
+
 
 [System.Serializable]
 public class ClusteringResponse
@@ -698,5 +790,6 @@ public class ClusteringResponse
     public string message;
     public List<ClusterLegendItem> legend;
     public List<ClusterUpdateItem> updates;
+
     public List<int> clusters;
 }

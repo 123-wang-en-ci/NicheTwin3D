@@ -24,7 +24,7 @@ Shader "Custom/InstancedPointShader"
             
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
-            // GPU Instancing Buffer - Read data from ComputeBuffer
+            // GPU Instancing Buffer - read data from ComputeBuffer
             StructuredBuffer<float3> _CellPositions;
             StructuredBuffer<float> _CellScales;
             StructuredBuffer<float4> _CellColors;
@@ -61,7 +61,7 @@ Shader "Custom/InstancedPointShader"
                 float scale = _CellScales[instanceID] * _GlobalScale;
                 float4 cellColor = _CellColors[instanceID];
                 
-                // Apply scaling and position transformation
+                //Apply scaling and position transformation
                 float3 scaledPosition = input.positionOS.xyz * scale;
                 float3 worldPosition = worldPos + scaledPosition;
                 

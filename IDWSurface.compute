@@ -4,8 +4,8 @@
 StructuredBuffer<float3> _CellPositions;
 StructuredBuffer<float> _CellExpressions;
 StructuredBuffer<float4> _CellColors;
-StructuredBuffer<int> _CellTypeIds;     // Cell types buffer
-StructuredBuffer<float> _CellScales;    // Used to skip hidden cells (scale=0)
+StructuredBuffer<int> _CellTypeIds;     // New: Cell types buffer
+StructuredBuffer<float> _CellScales; // Used to skip hidden cells (scale=0)
 int _CellCount;
 
 // Grid parameters
@@ -42,7 +42,7 @@ void ComputeGridSurface (uint3 id : SV_DispatchThreadID)
     
     float radiusSqr = _SmoothingRadius * _SmoothingRadius;
     
-    // For typed views (AI_Annotation=2, TissueRegion=3, ZeroShot=4), a large surface tension fusion radius is given
+    // For classification type views (AI_Annotation=2, TissueRegion=3, ZeroShot=4), give a large surface tension fusion radius
     bool isCategoryMode = (_ViewMode == 2 || _ViewMode == 3 || _ViewMode == 4);
     if (isCategoryMode) {
         radiusSqr *= 2.5; 
@@ -84,18 +84,18 @@ void ComputeGridSurface (uint3 id : SV_DispatchThreadID)
         float baseHeight = sumHeight / sumWeight;
         
         if (isCategoryMode) {
-            // The plain is forced to equal height
+            //Plains are forced to equal heights
             baseHeight = 0.5;
-            // A fluid-level rounded downward chamfer is produced at the edge (Bevel)
+            // Create a fluid-level rounded downward chamfer (Bevel) at the edge
             float bevel = smoothstep(densityThreshold, densityThreshold * 2.5, sumWeight);
             _GridHeights[index] = baseHeight * bevel;
             
             float4 finalColor = sumColor / sumWeight;
-            // Fine-tune the alpha so that the clip physical fault cuts at the edge of the droplet closest to the ground
+            // Fine-tune alpha so that the clip physical fault is cut at the edge of the water droplet closest to the ground
             finalColor.a = smoothstep(densityThreshold, densityThreshold * 1.2, sumWeight);
             _GridColors[index] = finalColor;
         } else {
-            // Traditional imputation of gene expression
+            // Traditional interpolation of gene expression
             _GridHeights[index] = baseHeight;
             float4 finalColor = sumColor / sumWeight;
             finalColor.a = 1.0; 

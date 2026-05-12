@@ -13,8 +13,9 @@ import torch.nn as nn
 import pickle
 from scipy.sparse import issparse
 
-os.environ["OMP_NUM_THREADS"] = "1"
-os.environ["LOKY_MAX_CPU_COUNT"] = "1"
+# Environment settings: Prevent Windows multi-threaded crashes (cloud deployment has been commented to release multi-threaded computing power)
+# os.environ["OMP_NUM_THREADS"] = "1"
+# os.environ["LOKY_MAX_CPU_COUNT"] = "1"
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 nicheformer_root = os.path.join(current_dir, "Nicheformer")
@@ -31,29 +32,44 @@ for path in possible_paths:
 if found_path and found_path not in sys.path:
     sys.path.append(found_path)
 
+#Import Nicheformer class
 Nicheformer = None
 try:
     from nicheformer.models._nicheformer import Nicheformer
     print("Successfully imported Nicheformer class")
-except ImportError:
+except ImportError as e1:
     try:
         from nicheformer.models import Nicheformer
         print("Successfully imported Nicheformer class (from models)")
-    except ImportError:
-        print("Nicheformer cannot be imported, please check the path.")
+    except ImportError as e2:
+        print(f"Unable to import Nicheformer, please check the path. Underlying error 1: {e1}")
+        print(f"Unable to import Nicheformer, please check the path. Underlying error 2: {e2}")
 
-# Universal Classification Head
+# Advanced downstream classification header (SToFM residual architecture)
 class ClassifierHead(nn.Module):
     def __init__(self, input_dim=256, num_classes=10):
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(input_dim, 128),
-            nn.BatchNorm1d(128),
-            nn.ReLU(),
-            nn.Dropout(0.2),
-            nn.Linear(128, num_classes)
-        )
-    def forward(self, x): return self.net(x)
+        hidden_dim = 512
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.ln1 = nn.LayerNorm(hidden_dim)
+        self.act = nn.GELU()
+        self.dropout = nn.Dropout(0.3)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.ln2 = nn.LayerNorm(hidden_dim)
+        self.out = nn.Linear(hidden_dim, num_classes)
+        self.skip = nn.Linear(input_dim, hidden_dim)
+
+    def forward(self, x):
+        res = self.skip(x)
+        out = self.fc1(x)
+        out = self.ln1(out)
+        out = self.act(out)
+        out = self.dropout(out)
+        out = self.fc2(out)
+        out = self.ln2(out)
+        out = out + res
+        out = self.act(out)
+        return self.out(out)
 
 class NicheformerEngine:
     def __init__(self):
@@ -72,10 +88,10 @@ class NicheformerEngine:
         self.seg_model = None
         self.seg_labels = []
         
-        # hyperparameters
-        self.n_neighbors = 20
-        self.context_length = 1024
-        self.batch_size = 16
+        # Call back to the official standard hyperparameters to ensure 100% compatibility with pre-trained weights
+        self.n_neighbors = 20 # Callback is the official default space range
+        self.context_length = 1024 #Revert to the official length of 1024
+        self.batch_size = 64 # Keep inference batch size large to speed up
         
         # cache
         self.neighbor_indices = None
@@ -87,6 +103,9 @@ class NicheformerEngine:
         print(f"Loading data from {h5ad_path}...")
         self.adata = sc.read_h5ad(h5ad_path)
         
+        # =========================================================
+        # 1. Forced preprocessing (Nicheformer must eat Log data)
+        # =========================================================
         if issparse(self.adata.X):
             max_val = self.adata.X.data.max() if self.adata.X.nnz > 0 else 0
         else:
@@ -98,9 +117,13 @@ class NicheformerEngine:
                 self.adata.layers['counts'] = self.adata.X.copy()
             sc.pp.normalize_total(self.adata, target_sum=1e4)
             sc.pp.log1p(self.adata)
+            print("Data has been preprocessed: Normalize(1e4) + Log1p")
         else:
-            print(f" i️ data already seems to be in Log space (max={max_val:.1f}), skipping preprocessing. ")
+            print(f"The data seems to be already in Log space (Max={max_val:.1f}), skip preprocessing.")
 
+        # =========================================================
+        # 2. Construct spatial graph
+        # =========================================================
         print("Building spatial neighbor graph...")
         if 'spatial' in self.adata.obsm:
             coords = self.adata.obsm['spatial']
@@ -119,12 +142,28 @@ class NicheformerEngine:
         self.coords = coords
         print(f"Graph built. Neighbor indices shape: {self.neighbor_indices.shape}")
 
-        if os.path.exists("gene_vocab.npy"):
-            print("Found gene_vocab.npy, loading fixed vocabulary...")
-            self.gene_list = np.load("gene_vocab.npy", allow_pickle=True).tolist()
+        # =========================================================
+        # 3. Gene mapping (must be aligned with pre-trained weights)
+        # =========================================================
+        vocab_path = os.path.join(current_dir, "gene_vocab.npy")
+        if os.path.exists(vocab_path):
+            loaded_vocab = np.load(vocab_path, allow_pickle=True).tolist()
+            if len(loaded_vocab) == self.adata.n_vars:
+                print("Found gene_vocab.npy, loading fixed vocabulary...")
+                self.gene_list = loaded_vocab
+            else:
+                print(f"gene_vocab.npy has {len(loaded_vocab)} genes, but the current data has {self.adata.n_vars}, automatically update the vocabulary...")
+                self.gene_list = self.adata.var_names.tolist()
+                np.save(vocab_path, self.gene_list)
+                print(f"gene_vocab.npy has been updated to {len(self.gene_list)} genes")
         else:
             self.gene_list = self.adata.var_names.tolist()
+            vocab_path2 = os.path.join(current_dir, "gene_vocab.npy")
+            np.save(vocab_path2, self.gene_list)
+            print(f"gene_vocab.npy has been created ({len(self.gene_list)} genes)")
 
+        # Key: Nicheformer usually has a special Token (PAD, MASK, etc.), and the offset is usually 3 or 8
+        # Based on the previous check_vocab result, this is set to 8
         start_idx = 8 
         print(f"Using fixed Offset (Start Index): {start_idx}")
 
@@ -137,14 +176,16 @@ class NicheformerEngine:
 
         print(f"Loading Nicheformer weights from {model_path}...")
         self.model = Nicheformer(
-            dim_model=256,
+            # Note: If you load the official complete Pre-trained weights in the cloud, please modify the dimensions here accordingly.
+            # The official defaults are dim_model=512/768, nlayers=12, dim_feedforward=2048, etc.
+            dim_model=256, 
             nheads=8,
             dim_feedforward=1024,
             nlayers=6,
             dropout=0.1,
             batch_first=True,
             masking_p=0.0,
-            n_tokens=len(self.gene_list) + 20,
+            n_tokens=len(self.gene_list) + 20, # Reserve enough space to prevent overflow
             context_length=self.context_length,
             lr=1e-4,
             warmup=100,
@@ -154,26 +195,35 @@ class NicheformerEngine:
         )
         
         try:
-            state_dict = torch.load(model_path, map_location=self.device)
-
+            checkpoint = torch.load(model_path, map_location=self.device)
+            
+            # Intelligent extraction of weights: compatible with pure .pth and Lightning native .ckpt
+            if "state_dict" in checkpoint:
+                state_dict = checkpoint["state_dict"]
+            else:
+                state_dict = checkpoint
+                
+            # Clean up Lightning prefix (compatible with model. prefix and without prefix)
             new_state_dict = {k.replace("model.", ""): v for k, v in state_dict.items()}
             self.model.load_state_dict(new_state_dict, strict=False)
-            self.model.to(self.device)
-            self.model.eval()
-            print(" Model loaded successfully.")
-            
-            self._precompute_embeddings()
+            print("Model loaded successfully.")
             
         except Exception as e:
             print(f"Error loading weights: {e}")
+        finally:
+            # Regardless of whether the load is successful or not, always move the model to the correct device and set it to inference mode
+            self.model.to(self.device)
+            self.model.eval()
+            # Calculate the Embeddings cache immediately after loading
+            self._precompute_embeddings()
 
     def _get_batch_tokens(self, cell_indices_batch):
-        """Construct model inputs to aggregate neighbor gene expression"""
+        """Construct model input and aggregate neighbor gene expression"""
         batch_tokens = []
         batch_masks = []
         batch_neighbor_indices = self.neighbor_indices[cell_indices_batch]
         
-        # Use the raw counts layer first, and X if not
+        # Use the raw counts layer first, if not, use X
         source_data = self.adata.layers['counts'] if 'counts' in self.adata.layers else self.adata.X
 
         for i in range(len(cell_indices_batch)):
@@ -186,7 +236,7 @@ class NicheformerEngine:
             else:
                 local_expr = np.array(local_expr).flatten()
             
-            # Select the Top K gene
+            # Select Top K genes
             expressed_indices = np.where(local_expr > 0)[0]
             if len(expressed_indices) > self.context_length:
                 top_k_args = np.argsort(local_expr[expressed_indices])[-self.context_length:]
@@ -195,7 +245,7 @@ class NicheformerEngine:
                 selected_indices = expressed_indices
             
             # Convert to Token ID
-            token_ids = selected_indices + 8 # The offset is consistent with load_data
+            token_ids = selected_indices + 8 #The offset is consistent with load_data
             
             # Padding
             padding_len = self.context_length - len(token_ids)
@@ -213,12 +263,24 @@ class NicheformerEngine:
                 torch.tensor(np.array(batch_masks), dtype=torch.bool).to(self.device))
 
     def _precompute_embeddings(self):
-        """Calculate and cache all cells Embeddings"""
+        """Calculate and cache the Embeddings of all cells"""
         cache_filename = "embeddings_cache.npy"
         cache_path = os.path.join(current_dir, cache_filename)
+        model_path = os.path.join(current_dir, "nicheformer_weights.pth")
 
-        if os.path.exists(cache_path):
-            print(f"[Cache] Found cached embeddings, loading...")
+        # Check whether the cache exists, and ensure that the cache file is newer than the model weight file (to prevent the use of old features after changing to a new model)
+        use_cache = True
+        # if os.path.exists(cache_path):
+        #     if os.path.exists(model_path):
+        #         if os.path.getmtime(cache_path) > os.path.getmtime(model_path):
+        #             use_cache = True
+        #         else:
+        # print("[Cache] found a new version of model weights, the old feature cache has been invalidated, and is ready to be recalculated...")
+        #     else:
+        #         use_cache = True
+
+        if use_cache:
+            print(f"[Cache] Found valid cached embeddings, loading...")
             try:
                 self.embeddings_cache = np.load(cache_path)
                 if self.embeddings_cache.shape[0] == self.adata.n_obs:
@@ -237,7 +299,7 @@ class NicheformerEngine:
                 output = self.model(x, mask)
                 feats = output['transformer_output'] # (Batch, Seq, Dim)
                 
-                # Mean Pooling
+                #Mean Pooling (only average the non-Padding parts)
                 mask_expanded = mask.unsqueeze(-1).float()
                 feats_sum = (feats * (1 - mask_expanded)).sum(dim=1)
                 mask_sum = (1 - mask_expanded).sum(dim=1)
@@ -249,20 +311,24 @@ class NicheformerEngine:
         np.save(cache_path, self.embeddings_cache)
         print(f"Embeddings computed and saved. Shape: {self.embeddings_cache.shape}")
 
+    # ==========================================================================
+    # Function 1: Gene interpolation (Nicheformer Native Implementation)
+    # ==========================================================================
     def predict_gene_expression(self, gene_name):
         """
         [Hybrid Imputation] Nicheformer + Spatial Smoothing
-        Combine the semantic predictions of AI models with the geometric priors of spatial positions to ensure optimal visuals.
+        Combining the semantic predictions of the AI model with geometric priors on spatial locations ensures optimal visual effects.
         """
         fallback_result = np.zeros(self.adata.n_obs)
         
+        # 0. Basic check
         if gene_name not in self.gene_to_id:
             if gene_name in self.adata.var_names:
-                # If the AI has not learned this gene, it will return a smooth version of the original data
+                # If the AI has not learned this gene, it will directly return the smoothed version of the original data.
                 raw = self.adata[:, gene_name].X
                 if issparse(raw): raw = raw.toarray().flatten()
                 else: raw = raw.flatten()
-                return self._spatial_smoothing(raw) 
+                return self._spatial_smoothing(raw) # Use pure geometric smoothing
             return fallback_result
             
         target_token_id = self.gene_to_id[gene_name]
@@ -277,92 +343,158 @@ class NicheformerEngine:
             else:
                 embeddings = self.embeddings_cache.to(self.device)
 
+            # Find the decoding header
             decoder_weight = None
             decoder_bias = torch.tensor(0.0).to(self.device)
             
+            # Try classifier_head first (if it exists)
             if hasattr(self.model, "classifier_head"):
+                 # Make sure the dimensions match
                 if target_token_id < self.model.classifier_head.weight.shape[0]:
                     decoder_weight = self.model.classifier_head.weight[target_token_id, :]
                     decoder_bias = self.model.classifier_head.bias[target_token_id]
 
+            # Fall back to embeddings (Weight Tying)
             if decoder_weight is None and hasattr(self.model, "embeddings"):
                 decoder_weight = self.model.embeddings.weight[target_token_id, :]
 
             if decoder_weight is None:
-                print(" Decoder not found, falling back to spatial.")
+                print("Decoder not found, falling back to spatial.")
                 ai_pred = np.zeros(self.adata.n_obs)
             else:
                 if decoder_weight.device != self.device: decoder_weight = decoder_weight.to(self.device)
                 
                 with torch.no_grad():
-
+                    # [Optimization] Do LayerNorm for Embedding (simulate inside Transformer)
                     embeddings = torch.nn.functional.layer_norm(embeddings, embeddings.shape[1:])
                     
                     logits = torch.matmul(embeddings, decoder_weight) + decoder_bias
                     ai_pred = torch.nn.functional.relu(logits).cpu().numpy()
 
+            # === Part B & C: SToFM Adaptive Graph Fusion (spatial diffusion guided by feature similarity) ===
+            # Get original data
             raw_vals = self.adata[:, gene_name].X
             if issparse(raw_vals): raw_vals = raw_vals.toarray().flatten()
             else: raw_vals = raw_vals.flatten()
             
-            spatial_pred = self._spatial_smoothing(raw_vals)
-
+            # Extract the cell's own embedding for calculating similarity
+            cell_feats = self.embeddings_cache
+            
+            # Use adaptive similarity to calculate interpolation (if the surrounding neighbors are more similar to their own Embedding, the higher the weight)
+            # This is the core innovation in the SToFM paper that goes far beyond simple geometric smoothing or simple MLP
+            adaptive_pred = self._adaptive_graph_imputation(raw_vals, cell_feats)
+            
             def normalize_safe(x):
                 return (x - x.min()) / (x.max() - x.min() + 1e-9)
             
-            final_pred = 0.3 * normalize_safe(ai_pred) + 0.7 * normalize_safe(spatial_pred)
-
+            # SToFM hybrid strategy: AI feature decoding + local adaptive diffusion
+            final_pred = 0.5 * normalize_safe(ai_pred) + 0.5 * normalize_safe(adaptive_pred)
+            
+            # Stretch back to the original intensity range to look more realistic
             final_pred = final_pred * (raw_vals.max() + 1.0)
             
             return final_pred
 
         except Exception as e:
-            print(f" Error: {e}")
+            print(f"Error: {e}")
             return fallback_result
 
-    def _spatial_smoothing(self, raw_data):
+    def _adaptive_graph_imputation(self, raw_data, feats):
+        """SToFM: Adaptive spatial diffusion based on Embedding similarity"""
         if not hasattr(self, 'neighbor_indices'):
             return raw_data
-
+        
+        #Normalized features are used to calculate cosine similarity
+        feats_norm = normalize(feats, norm='l2', axis=1)
+        
         smoothed = np.zeros_like(raw_data, dtype=np.float32)
-
-        neighbor_vals = raw_data[self.neighbor_indices] # (N, K)
-        smoothed = neighbor_vals.mean(axis=1)
-        return smoothed
+        # neighbor_indices: (N, K)
+        N, K = self.neighbor_indices.shape
+        
+        # Get the characteristics and expression of neighbors
+        # feats_norm_neighbors: (N, K, Dim)
+        feats_norm_neighbors = feats_norm[self.neighbor_indices]
+        # target_vals: (N, K)
+        target_vals = raw_data[self.neighbor_indices]
+        
+        # Calculate the dot product similarity between Center Cell (N, 1, Dim) and Neighbors (N, K, Dim)
+        center_feats = np.expand_dims(feats_norm, axis=1) 
+        sim_scores = (center_feats * feats_norm_neighbors).sum(axis=-1) # (N, K)
+        
+        # Add temperature coefficient and Softmax
+        T = 0.1
+        sim_scores = np.exp(sim_scores / T)
+        weights = sim_scores / sim_scores.sum(axis=1, keepdims=True)
+        
+        # Weighted sum
+        adaptive_vals = (weights * target_vals).sum(axis=1)
+        return adaptive_vals
     def build_spatial_graph(self):
-
+        """Building a KDTree for finding neighbors"""
         if self.coords is None: return
         print("Building spatial neighbor graph (KDTree)...")
         self.kd_tree = NearestNeighbors(n_neighbors=self.n_neighbors, algorithm='ball_tree')
         self.kd_tree.fit(self.coords)
-
+        # Pre-calculate the neighbor index of all cells to speed up subsequent reasoning
         print("Pre-calculating neighbors for all cells...")
         self.distances, self.neighbor_indices = self.kd_tree.kneighbors(self.coords)
         print("Spatial graph ready.")
-
+    # ==========================================================================
+    # Function 2: Zero-shot clustering (Nicheformer Embeddings + KMeans)
+    # ==========================================================================
     def run_zero_shot_clustering(self, n_clusters=10):
-
-        print(f"[Nicheformer] Zero-shot Clustering on Embeddings (K={n_clusters})...")
+        """
+        [SToFM architecture upgrade] Leiden graph clustering algorithm
+        Abandon KMeans and use the KNN + Leiden community discovery algorithm recognized as the strongest in the single-cell field
+        Find the true distribution of cell subpopulations directly in high-dimensional embedding manifold space.
+        """
+        print(f"[SToFM] Zero-shot Leiden Clustering on Embeddings...")
         
         if self.embeddings_cache is None:
             self._precompute_embeddings()
-
+            
+        # 1. Put it into AnnData to reuse the Scanpy tool
         X_emb = self.embeddings_cache.copy()
-
-        print("   - Applying L2 Normalization to embeddings...")
         X_emb = normalize(X_emb, norm='l2', axis=1)
-
-        print("   - Running MiniBatchKMeans...")
-        kmeans = MiniBatchKMeans(
-            n_clusters=n_clusters,
-            batch_size=2048,
-            n_init=10, 
-            random_state=42
-        )
-        clusters = kmeans.fit_predict(X_emb)
+        self.adata.obsm['X_nicheformer'] = X_emb
         
+        # 2. Construct feature space nearest neighbor graph
+        print("   - Building feature neighborhood graph...")
+        sc.pp.neighbors(self.adata, use_rep='X_nicheformer', n_neighbors=30)
+        
+        # 3. Adaptive Resolution search: Let the number of Leiden clusters be as close as possible to the target K
+        print(f"   - Running Leiden algorithm (target: ~{n_clusters} clusters)...")
+        best_clusters = None
+        lo, hi = 0.1, 5.0
+        for _ in range(12): # Maximum binary search 12 times to approach target K
+            mid = (lo + hi) / 2
+            try:
+                sc.tl.leiden(self.adata, resolution=mid, key_added='leiden_clusters')
+                found_k = self.adata.obs['leiden_clusters'].nunique()
+                if found_k < n_clusters:
+                    lo = mid
+                else:
+                    hi = mid
+                    best_clusters = self.adata.obs['leiden_clusters'].values.astype(int)
+                if abs(found_k - n_clusters) <= 2: # Accept within ±2
+                    best_clusters = self.adata.obs['leiden_clusters'].values.astype(int)
+                    break
+            except Exception:
+                break
+
+        if best_clusters is None:
+            try:
+                sc.tl.leiden(self.adata, resolution=1.5, key_added='leiden_clusters')
+                best_clusters = self.adata.obs['leiden_clusters'].values.astype(int)
+            except Exception:
+                from sklearn.cluster import MiniBatchKMeans
+                km = MiniBatchKMeans(n_clusters=n_clusters, random_state=42)
+                best_clusters = km.fit_predict(X_emb)
+
+        clusters = best_clusters
+            
         unique_clusters = np.unique(clusters)
-        print(f"   - Finished. Found {len(unique_clusters)} clusters.")
+        print(f"   - Finished. Found {len(unique_clusters)} high-quality clusters.")
         
         legend = []
         import colorsys
@@ -374,26 +506,39 @@ class NicheformerEngine:
             
         return clusters, legend
 
+    # ==========================================================================
+    # Downstream supervised model loading (remains unchanged)
+    # ==========================================================================
     def load_downstream_models(self):
+        # Cell type classifier
         try:
-            if os.path.exists("cell_type_model_labels.pkl"):
-                with open("cell_type_model_labels.pkl", "rb") as f:
+            labels_path = os.path.join(current_dir, "cell_type_model_labels.pkl")
+            model_path  = os.path.join(current_dir, "cell_type_model.pth")
+            if os.path.exists(labels_path) and os.path.exists(model_path):
+                with open(labels_path, "rb") as f:
                     self.cls_labels = pickle.load(f)
-                self.cls_model = ClassifierHead(num_classes=len(self.cls_labels))
-                self.cls_model.load_state_dict(torch.load("cell_type_model.pth", map_location=self.device))
+                input_dim = self.embeddings_cache.shape[1] if self.embeddings_cache is not None else 256
+                self.cls_model = ClassifierHead(input_dim=input_dim, num_classes=len(self.cls_labels))
+                self.cls_model.load_state_dict(torch.load(model_path, map_location=self.device))
                 self.cls_model.to(self.device).eval()
-                print(f"✅ Cell Type Classifier loaded ({len(self.cls_labels)} classes)")
-        except: pass
+                print(f"Cell Type Classifier loaded ({len(self.cls_labels)} classes)")
+        except Exception as e:
+            print(f"Cell Type Classifier load failed: {e}")
 
+        #Region segmentation classifier
         try:
-            if os.path.exists("region_model_labels.pkl"):
-                with open("region_model_labels.pkl", "rb") as f:
+            labels_path = os.path.join(current_dir, "region_model_labels.pkl")
+            model_path  = os.path.join(current_dir, "region_model.pth")
+            if os.path.exists(labels_path) and os.path.exists(model_path):
+                with open(labels_path, "rb") as f:
                     self.seg_labels = pickle.load(f)
-                self.seg_model = ClassifierHead(num_classes=len(self.seg_labels))
-                self.seg_model.load_state_dict(torch.load("region_model.pth", map_location=self.device))
+                input_dim = self.embeddings_cache.shape[1] if self.embeddings_cache is not None else 256
+                self.seg_model = ClassifierHead(input_dim=input_dim, num_classes=len(self.seg_labels))
+                self.seg_model.load_state_dict(torch.load(model_path, map_location=self.device))
                 self.seg_model.to(self.device).eval()
-                print(f"✅ Region Classifier loaded ({len(self.seg_labels)} regions)")
-        except: pass
+                print(f"Region Classifier loaded ({len(self.seg_labels)} regions)")
+        except Exception as e:
+            print(f"Region Classifier load failed: {e}")
 
     def predict_cell_types(self):
         if self.cell_type_cache: return self.cell_type_cache

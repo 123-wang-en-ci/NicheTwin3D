@@ -10,11 +10,11 @@ public class GPURenderer : MonoBehaviour
     public Mesh cellMesh;
     public Material cellMaterial;
     public Material surfaceMaterial; // Surface Shader Material
-    public ComputeShader idwComputeShader; 
-    public int gridResolution = 200;       // Determines the fineness of the surface
-    public float surfaceSmoothingRadius = 5.0f; //  Determine the smoothness and adjust it as needed
-    public bool showSurfaceMode = false;   // Whether it is in interpolated surface mode
-    public int maxSurfaceInstances = 45;   // Decide how many independent cell type surfaces can be generated
+    public ComputeShader idwComputeShader; // Add Compute Shader reference
+    public int gridResolution = 200; // Determine the fineness of the surface
+    public float surfaceSmoothingRadius = 5.0f; // Determine the smoothness, adjust as needed
+    public bool showSurfaceMode = false; // Whether it is in interpolation surface mode
+    public int maxSurfaceInstances = 45; //Determine how many independent cell type surfaces can be generated
     public Gradient colorGradient;
     
     [Header("Scaling Parameters")]
@@ -33,10 +33,10 @@ public class GPURenderer : MonoBehaviour
     public float brightness = 0.9f;
 
     [Header("Imputation System")]
-    public Color imputedCellColor = Color.green; // Exclusive fluorescent color of the insertion of hypoplasia cells
-    public bool enableImputedColorOverride = true; // Whether to turn on the cut-off staining switch
+    public Color imputedCellColor = Color.green; // Exclusive fluorescent color of imputed cells
+    public bool enableImputedColorOverride = true; // Whether to turn on the truncation coloring switch
 
-    // GPU data structures
+    //GPU data structure
     public struct CellDataGPU
     {
         public Vector3 position;
@@ -44,7 +44,7 @@ public class GPURenderer : MonoBehaviour
         public Vector4 color;
         public float expression;
         
-        // Transfer cell true type for surface separation
+        // Pass the cell true type for surface separation
         public int typeId;
     }
 
@@ -66,12 +66,12 @@ public class GPURenderer : MonoBehaviour
     private ComputeBuffer gridColorsBuffer;
     private float gridMinX, gridMaxX, gridMinZ, gridMaxZ;
     
-    // data storage
+    //data storage
     private List<CellDataGPU> cellDataList = new List<CellDataGPU>();
     private Dictionary<string, int> cellIdToIndexMap = new Dictionary<string, int>();
-    private List<string> cellIdList = new List<string>(); // Used to find IDs by index
+private List<string> cellIdList = new List<string>(); // Used to find ID by index
 
-    // View Pattern Enumeration (Shared with DataLoader)
+    // View mode enumeration (shared with DataLoader)
     public enum ViewMode
     {
         Expression,
@@ -81,7 +81,7 @@ public class GPURenderer : MonoBehaviour
         ZeroShot
     }
     
-    // View mode related
+    //View mode related
     public ViewMode currentViewMode = ViewMode.Expression;
     
     void Awake()
@@ -108,7 +108,7 @@ public class GPURenderer : MonoBehaviour
     {
         if (cellCount == 0) return;
 
-        //  If surface display is enabled, render the multi-instance computing plane of separation (Expression/TissueRegion/AI_Annotation/ZeroShot is supported)
+        // If surface display is turned on, render separate multi-instance calculation planes (supports Expression/TissueRegion/AI_Annotation/ZeroShot)
         bool canShowSurface = (currentViewMode == ViewMode.Expression || currentViewMode == ViewMode.TissueRegion || currentViewMode == ViewMode.AI_Annotation || currentViewMode == ViewMode.ZeroShot);
         if (canShowSurface && showSurfaceMode && surfaceMaterial != null && surfaceTopologyMesh != null)
         {
@@ -123,7 +123,7 @@ public class GPURenderer : MonoBehaviour
                 false
             );
         }
-        // Instead, it renders the spherical dot cloud
+        // Otherwise render the sphere point cloud
         else if (cellMaterial != null && cellMesh != null)
         {
             Graphics.DrawMeshInstancedIndirect(
@@ -173,23 +173,23 @@ public class GPURenderer : MonoBehaviour
         typeColors = new Color[typeColorCount];
         regionColors = new Color[typeColorCount];
         
-        // Use the golden ratio to make a big jump in the hue wheel
+        // Use the golden ratio to jump up the hue circle significantly
         float goldenRatioConjugate = 0.618033988749895f;
         
         for (int i = 0; i < typeColorCount; i++)
         {
-            //  For cell annotations, slowly add up the golden section from 0 to ensure the greatest color contrast for each new index
+            // For cell annotation, slowly accumulate the golden section from 0 to ensure the maximum color contrast for each new index.
             float hue = (i * goldenRatioConjugate) % 1.0f;
             typeColors[i] = Color.HSVToRGB(hue, saturation, brightness);
             
-            // For zone segmentation, a completely different starting phase and slightly altered saturation/brightness are used to give it a very different style
+            // For region segmentation, use a completely different starting phase and slightly changed saturation/brightness to give it a completely different style
             float regionHue = ((i * goldenRatioConjugate) + 0.5f) % 1.0f;
             regionColors[i] = Color.HSVToRGB(regionHue, Mathf.Clamp01(saturation + 0.15f), Mathf.Clamp01(brightness - 0.1f));
         }
         Debug.Log($"[GPU Renderer] Generated {typeColorCount} type & region distinct colors using Golden Ratio");
     }
 
-    // Initialize data (called from DataLoader)
+    //Initialize data (called from DataLoader)
     public void InitializeData(List<CellDataGPU> data, Dictionary<string, int> idToIndexMap, List<string> idList)
     {
         this.cellDataList = new List<CellDataGPU>(data);
@@ -280,16 +280,18 @@ public class GPURenderer : MonoBehaviour
         
         if (cellCount == 0) return;
         
-
+        //Create each attribute Buffer
         positionBuffer = new ComputeBuffer(cellCount, sizeof(float) * 3);
         scaleBuffer = new ComputeBuffer(cellCount, sizeof(float));
         colorBuffer = new ComputeBuffer(cellCount, sizeof(float) * 4);
         expressionBuffer = new ComputeBuffer(cellCount, sizeof(float));
         typeIdBuffer = new ComputeBuffer(cellCount, sizeof(int));
-
+        
+        // Expand the surface data Buffer multiple to accommodate all instances
         gridHeightsBuffer = new ComputeBuffer(gridResolution * gridResolution * maxSurfaceInstances, sizeof(float));
         gridColorsBuffer = new ComputeBuffer(gridResolution * gridResolution * maxSurfaceInstances, sizeof(float) * 4);
-
+        
+        // Create Args Buffer
         argsBuffer = new ComputeBuffer(1, args.Length * sizeof(uint), ComputeBufferType.IndirectArguments);
         
         args[0] = (uint)cellMesh.GetIndexCount(0);
@@ -299,6 +301,7 @@ public class GPURenderer : MonoBehaviour
         args[4] = 0;
         argsBuffer.SetData(args);
         
+        // Bind Buffer to Material (Spheres)
         if (cellMaterial != null)
         {
             cellMaterial.SetBuffer("_CellPositions", positionBuffer);
@@ -309,6 +312,7 @@ public class GPURenderer : MonoBehaviour
             cellMaterial.SetFloat("_EmissionStrength", emissionIntensity);
         }
 
+        // Bind Buffer to Surface Material
         if (surfaceMaterial != null)
         {
             surfaceMaterial.SetBuffer("_GridHeights", gridHeightsBuffer);
@@ -343,7 +347,7 @@ public class GPURenderer : MonoBehaviour
         idwComputeShader.SetInt("_MaxTypes", maxSurfaceInstances);
         idwComputeShader.SetInt("_ViewMode", (int)currentViewMode);
         
-        // distribution Compute Shader (3D Dispatch)
+        // Dispatch Compute Shader (3D Dispatch)
         int threadGroups = Mathf.CeilToInt(gridResolution / 8.0f);
         idwComputeShader.Dispatch(kernel, threadGroups, threadGroups, maxSurfaceInstances);
     }
@@ -374,7 +378,7 @@ public class GPURenderer : MonoBehaviour
         typeIdBuffer.SetData(typeIds);
     }
 
-    // Update the visuals of individual cells
+    //Update the visual effect of a single cell
     public void UpdateCellVisual(string cellId, Vector3 position, Color color, float scale, float expression)
     {
         if (!cellIdToIndexMap.ContainsKey(cellId)) return;
@@ -389,7 +393,7 @@ public class GPURenderer : MonoBehaviour
         
         cellDataList[index] = cell;
         
-        // Update the corresponding Buffer data
+        //Update the corresponding Buffer data
         positionBuffer.SetData(new Vector3[] { position }, 0, index, 1);
         scaleBuffer.SetData(new float[] { scale }, 0, index, 1);
         colorBuffer.SetData(new Vector4[] { new Vector4(color.r, color.g, color.b, color.a) }, 0, index, 1);
@@ -397,7 +401,7 @@ public class GPURenderer : MonoBehaviour
         // typeId updates are typically static, but can add it if needed
     }
 
-    // Update cell visuals in bulk
+    // Batch update cell visual effects
     public void UpdateCellsVisual(List<string> cellIds, List<Vector3> positions, List<Color> colors, List<float> scales, List<float> expressions)
     {
         for (int i = 0; i < cellIds.Count && i < cellDataList.Count; i++)
@@ -423,7 +427,7 @@ public class GPURenderer : MonoBehaviour
         UpdateAllBuffers();
     }
 
-    // Update all cells according to the view pattern
+    //Update all cells based on view mode
     public void RefreshAllCells(ViewMode mode, Dictionary<string, float> expressionMap, 
         Dictionary<string, int> typeMap, Dictionary<string, int> aiPredictionMap,
         Dictionary<string, int> zeroShotClusterMap, Dictionary<int, Color> zeroShotColorMap,
@@ -527,33 +531,40 @@ public class GPURenderer : MonoBehaviour
 
                 case ViewMode.TissueRegion:
                     targetValue = 0.5f;
-                    scale = 0.5f;
+                    scale = 0.5f; //default size
+
                     if (regionMap != null && regionMap.ContainsKey(cellId))
                     {
                         int regionId = regionMap[cellId];
 
+                        // [Core Repair]: This is the key judgment for DropDown to take effect!
+                        // If highlightedRegionID is -1 (Show All), or the regionId of the current cell is equal to the selected ID
                         if (highlightedRegionID == -1 || regionId == highlightedRegionID)
                         {
-
+// display and color
                             int safeId = Mathf.Clamp(regionId, 0, regionColors.Length - 1);
                             baseColor = regionColors[safeId];
-
+//The selected one can be slightly enlarged
                             scale = 0.8f;
                         }
                         else
                         {
+                            // [If it doesn’t match, hide it]
                             scale = 0.0f;
                         }
                     }
                     else
                     {
+                        //Hide cells without area information
                         scale = 0.0f;
                     }
                     break;
             }
             
+            // Update position (keep X and Z, update Y)
             Vector3 newPos = new Vector3(cell.position.x, targetValue * heightMultiplier, cell.position.z);
-
+            
+            // If continuous surface mode is displayed, we need to add an offset consistent with the Shader to synchronize the collision body
             if (showSurfaceMode)
             {
                 newPos.y += 0.1f;
@@ -568,6 +579,7 @@ public class GPURenderer : MonoBehaviour
                 cell.expression = expressionMap[cellId];
             }
             
+            // Hijack typeId for the underlying Compute Shader to render tiled plain land according to different categories
             if (mode == ViewMode.TissueRegion && regionMap != null && regionMap.ContainsKey(cellId))
             {
                 cell.typeId = regionMap[cellId];
@@ -582,7 +594,7 @@ public class GPURenderer : MonoBehaviour
             }
             else if (typeMap != null && typeMap.ContainsKey(cellId))
             {
-                cell.typeId = typeMap[cellId]; 
+                cell.typeId = typeMap[cellId]; //Restore the native biological category ID
             }
             
             cellDataList[i] = cell;
@@ -596,12 +608,13 @@ public class GPURenderer : MonoBehaviour
         }
     }
 
+    // Get the index corresponding to the cell ID (for interaction detection)
     public bool TryGetCellIndex(string cellId, out int index)
     {
         return cellIdToIndexMap.TryGetValue(cellId, out index);
     }
 
-    // Obtain cellular data
+    // Get cell data
     public bool TryGetCellData(int index, out CellDataGPU cellData)
     {
         if (index >= 0 && index < cellDataList.Count)
@@ -613,7 +626,7 @@ public class GPURenderer : MonoBehaviour
         return false;
     }
 
-    // Obtain the cell ID
+    // Get cell ID
     public string GetCellId(int index)
     {
         if (index >= 0 && index < cellIdList.Count)
@@ -621,7 +634,7 @@ public class GPURenderer : MonoBehaviour
         return null;
     }
 
-    // Update the area color
+    //Update area color
     public void UpdateColorsForRegions(List<int> regionIds, Color[] palette)
     {
         if (regionIds == null || cellDataList == null || cellDataList.Count == 0) return;
@@ -639,7 +652,7 @@ public class GPURenderer : MonoBehaviour
         UpdateAllBuffers();
     }
 
-    // Set global parameters
+    //Set global parameters
     public void SetMaterialParameters(float globalScale, float emission)
     {
         if (cellMaterial != null)
@@ -653,6 +666,63 @@ public class GPURenderer : MonoBehaviour
         if (surfaceMaterial != null)
         {
             surfaceMaterial.SetFloat("_EmissionStrength", surfaceEmissionIntensity);
+        }
+    }
+
+    // Set the basic size independently for UI Slider to call
+    public void SetBaseScale(float scale)
+    {
+        SetMaterialParameters(scale, emissionIntensity);
+    }
+
+    // Set the height magnification independently for UI Slider to call
+    public void SetHeightMultiplier(float newMultiplier)
+    {
+        heightMultiplier = newMultiplier;
+
+        if (surfaceMaterial != null)
+        {
+            surfaceMaterial.SetFloat("_HeightMultiplier", heightMultiplier);
+        }
+
+        if (cellCount == 0) return;
+
+        // Recalculate the Y-axis position of all cells
+        for (int i = 0; i < cellDataList.Count; i++)
+        {
+            CellDataGPU cell = cellDataList[i];
+            float targetValue = 0f;
+            
+            switch (currentViewMode)
+            {
+                case ViewMode.Expression:
+                    targetValue = cell.expression;
+                    break;
+                case ViewMode.CellType:
+                    targetValue = 1.0f;
+                    break;
+                case ViewMode.AI_Annotation:
+                case ViewMode.ZeroShot:
+                case ViewMode.TissueRegion:
+                    targetValue = 0.5f;
+                    break;
+            }
+            
+            float newY = targetValue * heightMultiplier;
+            if (showSurfaceMode)
+            {
+                newY += 0.1f;
+            }
+            
+            cell.position = new Vector3(cell.position.x, newY, cell.position.z);
+            cellDataList[i] = cell;
+        }
+        
+        UpdateAllBuffers();
+
+        if (showSurfaceMode)
+        {
+            ComputeSurfaceInterpolation();
         }
     }
 }
