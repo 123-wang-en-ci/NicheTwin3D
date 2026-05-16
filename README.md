@@ -49,6 +49,7 @@ conda activate aivc
 
 # Install dependencies
 pip install torch==2.1.0+cu118 torchvision==0.16.0+cu118 torchtext==0.16.0+cpu --extra-index-url https://download.pytorch.org/whl/cu118
+
 conda env update -n aivc -f environment.yml
 
 # Start the service
