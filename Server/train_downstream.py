@@ -10,19 +10,17 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, TensorDataset
 from model_engine import NicheformerEngine
 
-# The directory where the code itself is located (based on this calculation of all paths, the correct file can be found no matter which directory it is executed from)
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
-# The column name of the real label stored in the H5AD file
-CELL_TYPE_COL = "cell_type" # 13 cell types
-REGION_COL = "clust_annot" # 43 brain region subtypes (the merged data set contains this column)
-####### ccf_region_name
-#Training parameters
+
+CELL_TYPE_COL = "cell_type"      
+REGION_COL    = "clust_annot"    
+
 BATCH_SIZE = 64
 EPOCHS = 100
 LR = 0.001
 
-# Advanced downstream task classification header (SToFM residual and layer normalization design)
+
 class ClassifierHead(nn.Module):
     def __init__(self, input_dim=256, num_classes=10):
         super().__init__()
@@ -49,14 +47,13 @@ class ClassifierHead(nn.Module):
         return self.out(out)
 
 def train_classifier(features, labels, save_name, device, save_dir):
-    print(f"\nStart training classifier: {save_name}")
+    print(f"\nStart training the classifier: {save_name}")
     
     le = LabelEncoder()
     targets = le.fit_transform(labels)
     num_classes = len(le.classes_)
-    print(f"{num_classes} classes detected: {le.classes_[:5]}...")
+    print(f"{num_classes} categories detected:: {le.classes_[:5]}...")
     
-    # Save tag encoder to absolute path
     labels_path = os.path.join(save_dir, f"{save_name}_labels.pkl")
     with open(labels_path, "wb") as f:
         pickle.dump(le.classes_.tolist(), f)
@@ -66,8 +63,7 @@ def train_classifier(features, labels, save_name, device, save_dir):
     val_ds = TensorDataset(torch.tensor(X_val).float(), torch.tensor(y_val).long())
     train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE)
-    
-    # Automatically infer input_dim from feature dimensions to prevent mismatches
+
     input_dim = features.shape[1]
     model = ClassifierHead(input_dim=input_dim, num_classes=num_classes).to(device)
     criterion = nn.CrossEntropyLoss()
@@ -101,7 +97,7 @@ def train_classifier(features, labels, save_name, device, save_dir):
             best_acc = acc
             torch.save(model.state_dict(), model_save_path)
             
-    print(f"Training completed. Best accuracy: {best_acc:.2f}%. Model has been saved to {model_save_path}")
+    print(f"Training completed. Best accuracy: {best_acc:.2f}%. The model is saved to  {model_save_path}")
 
 def main():
     h5ad_path  = os.path.join(current_dir, "merged_brain.h5ad")
@@ -120,20 +116,19 @@ def main():
         raw_labels = engine.adata.obs[CELL_TYPE_COL].astype(str)
         valid_mask = (engine.adata.obs[CELL_TYPE_COL].notna()) & (~raw_labels.isin(INVALID_LABELS))
         n_total, n_keep = len(raw_labels), valid_mask.sum()
-        print(f"Original number of cells: {n_total}, after filtering: {n_keep} ({n_total - n_keep} fuzzy cells are eliminated)")
+        print(f"Number of blasts: {n_total}, Filtered: {n_keep} (excludes {n_total - n_keep} fuzzy cells)")
         if n_keep > 0:
             train_classifier(embeddings[valid_mask], raw_labels[valid_mask].values,
                              "cell_type_model", engine.device, current_dir)
         else:
-            print("Error: There are no cells remaining after filtering, please check the filtering conditions!")
+            print("Error: There are no remaining cells after filtering, please check the filter conditions!")
 
     if REGION_COL and REGION_COL in engine.adata.obs:
         print("\nPreparing regional data...")
         region_labels = engine.adata.obs[REGION_COL].astype(str)
-        # Filter out NaN and 'n/a' in string form
         valid_mask = engine.adata.obs[REGION_COL].notna() & (region_labels != 'n/a') & (region_labels != 'N/A')
         n_keep = valid_mask.sum()
-        print(f"Regional data: {n_keep}/{engine.adata.n_obs} cells are valid after filtering")
+        print(f"Regional data: {n_keep}/{engine.adata.n_obs} cells are effective after filtering")
         train_classifier(embeddings[valid_mask],
                          region_labels[valid_mask].values,
                          "region_model", engine.device, current_dir)
