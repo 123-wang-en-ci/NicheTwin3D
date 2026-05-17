@@ -19,7 +19,7 @@ Project video explanation: [NicheTwin3D](https://www.youtube.com/watch?v=qL38RVw
 ### 1. Clone Repository & Environment Preparation
 
 ```markdown
-git clone https://github.com/your-username/NicheTwin3D.git
+git clone https://github.com/123-wang-en-ci/NicheTwin3D.git
 cd NicheTwin3D
 ```
 
