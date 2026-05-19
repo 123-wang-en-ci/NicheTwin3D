@@ -16,7 +16,7 @@ Project video explanation: [NicheTwin3D](https://www.youtube.com/watch?v=qL38RVw
 
 ## Installation
 
-### 1. Clone Repository & Environment Preparation
+### 1. Clone Repository
 
 ```markdown
 git clone https://github.com/123-wang-en-ci/NicheTwin3D.git
@@ -33,7 +33,6 @@ cd NicheTwin3D
 
 ### 3. Python Backend Configuration
 
-First, configure the Nicheformer model architecture by placing the Nicheformer source code inside the `NicheTwin3D-main\Server\Nicheformer` directory.
 
 Next, set up the running environment. Note that you need to create a virtual environment in Anaconda:
 
