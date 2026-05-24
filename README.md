@@ -30,7 +30,7 @@ D:\NicheTwin3D
 │  ├─ NicheTwin3D.exe
 │  └─ NicheTwin3D_Data
 │     └─ StreamingAssets
-└─ Downloads     ← 临时放 data.zip、NicheTwin3D_Windows.zip
+└─ Downloads     ← temporarily put data.zip、NicheTwin3D_Windows.zip
 ```
 
 不要放在：
