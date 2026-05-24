@@ -14,7 +14,7 @@ Project video explanation: [NicheTwin3D](https://www.youtube.com/watch?v=qL38RVw
 ---
 
 ## Installation
-
+Below are the streamlined installation steps. For a very detailed installation step, see 'Detailed installation steps.md'.
 ### 1. Clone Repository
 
 ```markdown
