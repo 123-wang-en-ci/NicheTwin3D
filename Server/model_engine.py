@@ -433,13 +433,13 @@ class NicheformerEngine:
     # ==========================================================================
     #  Task 2: Zero-shot Clustering (Nicheformer Embeddings + KMeans)
     # ==========================================================================
-    def run_zero_shot_clustering(self, n_clusters=10):
+    def run_zero_shot_clustering(self, resolution=1.0):
         """
         [SToFM Architecture Upgrade] Leiden Graph Clustering Algorithm
         Abandon KMeans, use the KNN + Leiden community detection algorithm widely recognized in the single-cell field
         Directly find the true cell subpopulation distribution in the high-dimensional Embedding manifold space.
         """
-        print(f"[SToFM] Zero-shot Leiden Clustering on Embeddings...")
+        print(f"[SToFM] Zero-shot Leiden Clustering on Embeddings (Resolution: {resolution})...")
         
         if self.embeddings_cache is None:
             self._precompute_embeddings()
@@ -453,36 +453,16 @@ class NicheformerEngine:
         print("   - Building feature neighborhood graph...")
         sc.pp.neighbors(self.adata, use_rep='X_nicheformer', n_neighbors=30)
         
-        # 3.  Adaptive Resolution Search: Make Leiden clustering number as close as possible to target K
-        print(f"   - Running Leiden algorithm (target: ~{n_clusters} clusters)...")
-        best_clusters = None
-        lo, hi = 0.1, 5.0
-        for _ in range(12):  #  Most 12 bisections to approximate the target K
-            mid = (lo + hi) / 2
-            try:
-                sc.tl.leiden(self.adata, resolution=mid, key_added='leiden_clusters')
-                found_k = self.adata.obs['leiden_clusters'].nunique()
-                if found_k < n_clusters:
-                    lo = mid
-                else:
-                    hi = mid
-                    best_clusters = self.adata.obs['leiden_clusters'].values.astype(int)
-                if abs(found_k - n_clusters) <= 2:  #  ±2 acceptable
-                    best_clusters = self.adata.obs['leiden_clusters'].values.astype(int)
-                    break
-            except Exception:
-                break
-
-        if best_clusters is None:
-            try:
-                sc.tl.leiden(self.adata, resolution=1.5, key_added='leiden_clusters')
-                best_clusters = self.adata.obs['leiden_clusters'].values.astype(int)
-            except Exception:
-                from sklearn.cluster import MiniBatchKMeans
-                km = MiniBatchKMeans(n_clusters=n_clusters, random_state=42)
-                best_clusters = km.fit_predict(X_emb)
-
-        clusters = best_clusters
+        print(f"   - Running Leiden algorithm (resolution: {resolution})...")
+        
+        try:
+            sc.tl.leiden(self.adata, resolution=resolution, key_added='leiden_clusters')
+            clusters = self.adata.obs['leiden_clusters'].values.astype(int)
+        except Exception as e:
+            print(f"Leiden clustering failed: {e}. Falling back to MiniBatchKMeans.")
+            from sklearn.cluster import MiniBatchKMeans
+            km = MiniBatchKMeans(n_clusters=10, random_state=42)
+            clusters = km.fit_predict(X_emb)
             
         unique_clusters = np.unique(clusters)
         print(f"   - Finished. Found {len(unique_clusters)} high-quality clusters.")

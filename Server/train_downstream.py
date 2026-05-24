@@ -104,7 +104,7 @@ def train_classifier(features, labels, save_name, device, save_dir):
     print(f" Training completed. Best accuracy: {best_acc:.2f}%. Model saved to {model_save_path}")
 
 def main():
-    h5ad_path  = os.path.join(current_dir, "merged_brain.h5ad")
+    h5ad_path  = os.path.join(current_dir, "Allen2022Molecular_lps_MsBrainAgingSpatialDonor_14_1  旧.h5ad")
     model_path = os.path.join(current_dir, "nicheformer_weights.pth")
 
     engine = NicheformerEngine()

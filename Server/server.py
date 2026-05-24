@@ -24,6 +24,7 @@ parser.add_argument("--output_dir", type=str, default="", help="Unity 打包后�
 args, _ = parser.parse_known_args()
 
 
+# H5AD_FILENAME = "Allen2022Molecular_lps_MsBrainAgingSpatialDonor_14_1  旧.h5ad" 
 H5AD_FILENAME = "Allen2022Molecular_lps_MsBrainAgingSpatialDonor_14_1.h5ad" 
 # H5AD_FILENAME = "train.h5ad" 
 # H5AD_FILENAME = "data.h5ad" 
@@ -53,7 +54,7 @@ class PerturbRequest(BaseModel):
     target_gene: str = "ENSMUSG00000037010"
 
 class ClusteringRequest(BaseModel):
-    n_clusters: int = 10
+    resolution: float = 1.0
 
 # Data management class (logical core)
 class DataManager:
@@ -612,7 +613,7 @@ async def zero_shot_cluster(req: ClusteringRequest):
             return JSONResponse(content={"status": "error", "message": "Model not loaded"}, status_code=500)
 
         # 1. Run clustering (returns pure number array, e.g., [0, 1, 0, ...])
-        cluster_ids_raw, legend_info = dm.ai_engine.run_zero_shot_clustering(req.n_clusters)
+        cluster_ids_raw, legend_info = dm.ai_engine.run_zero_shot_clustering(req.resolution)
         
         # 2. Get the ID (obs_names) of all cells
         # This step is very important to ensure that the ID and clustering result correspond one-to-one
