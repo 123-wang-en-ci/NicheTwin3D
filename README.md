@@ -33,8 +33,6 @@ D:\NicheTwin3D
 └─ Downloads     ← temporarily put data.zip、NicheTwin3D_Windows.zip
 ```
 
-不要放在：
-
 ### 2. Download Data
 
 **⚠️ IMPORTANT**: Due to their large file size, the model weights and H5AD datasets are NOT directly included in the GitHub repository. Please download them from Hugging Face:
