@@ -21,6 +21,19 @@ Below are the streamlined installation steps. For a very detailed installation s
 git clone https://github.com/123-wang-en-ci/NicheTwin3D.git
 cd NicheTwin3D
 ```
+Finally we hope to form this structure (**front-end and back-end folders at the same level**):
+
+```text
+D:\NicheTwin3D
+├─ Server        ← Python backend directory
+├─ NicheTwin3D   ← Windows front-end program
+│  ├─ NicheTwin3D.exe
+│  └─ NicheTwin3D_Data
+│     └─ StreamingAssets
+└─ Downloads     ← 临时放 data.zip、NicheTwin3D_Windows.zip
+```
+
+不要放在：
 
 ### 2. Download Data
 
