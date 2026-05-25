@@ -83,7 +83,12 @@ class DataManager:
         if args.output_dir:
             self.output_dir = args.output_dir
         else:
-            self.output_dir = os.path.join(self.base_dir, "..", "..", "StreamingAssets")
+            dev_path = os.path.join(self.base_dir, "..", "..", "StreamingAssets")
+            prod_path = os.path.join(self.base_dir, "..", "NicheTwin3D", "NicheTwin3D_Data", "StreamingAssets")
+            if os.path.exists(prod_path):
+                self.output_dir = prod_path
+            else:
+                self.output_dir = dev_path
 
     def load_and_sync_data(self):
         print(f"[Backend] Loading data: {H5AD_FILENAME} .....")
