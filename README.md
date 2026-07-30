@@ -10,7 +10,7 @@ This system is an interactive spatial transcriptomics digital twin framework bas
 
 
 
-Project video explanation: [https://youtu.be/vdO6wU3tO9o](https://youtu.be/jBrexNrnDWg)
+Project video explanation: [NicheTwin3D teaching video](https://youtu.be/jBrexNrnDWg)
 
 Promotional Video: [NicheTwin3D Promotional Video](https://youtu.be/iKN4C6cgCPc)
 
