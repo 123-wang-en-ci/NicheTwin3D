@@ -5,13 +5,13 @@ using System.Linq;
 
 public class DashboardManager : MonoBehaviour
 {
-    [Header("UI components")]
+    [Header("UI 组件")]
     public RectTransform barCurrent;
     public RectTransform barAverage; 
     public TextMeshProUGUI valCurrentText;
     public TextMeshProUGUI valAverageText;
 
-    [Header("set up")]
+    [Header("设置")]
     public float maxHeight = 200f;
 
     

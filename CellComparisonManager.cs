@@ -67,16 +67,31 @@ public class CellComparisonManager : MonoBehaviour
         if (afterLabelUI != null) afterLabelUI.SetActive(false);
     }
 
+    void OnEnable()
+    {
+        if (LocalizationManager.Instance != null)
+            LocalizationManager.Instance.OnLanguageChanged += UpdateButtonText;
+    }
+
+    void OnDisable()
+    {
+        if (LocalizationManager.Instance != null)
+            LocalizationManager.Instance.OnLanguageChanged -= UpdateButtonText;
+    }
+
     public void UpdateButtonText()
     {
         if (compareButton != null)
         {
+            string key = isComparisonMode ? "BTN_COMPARE_ON" : "BTN_COMPARE_OFF";
+            string textVal = LocalizationManager.Instance != null ? LocalizationManager.Instance.GetText(key) : (isComparisonMode ? "Compare: ON" : "Compare: OFF");
+
             TextMeshProUGUI tmpText = compareButton.GetComponentInChildren<TextMeshProUGUI>();
-            if (tmpText != null) tmpText.text = isComparisonMode ? "Compare: ON" : "Compare: OFF";
+            if (tmpText != null) tmpText.text = textVal;
             else
             {
                 Text uiText = compareButton.GetComponentInChildren<Text>();
-                if (uiText != null) uiText.text = isComparisonMode ? "Compare: ON" : "Compare: OFF";
+                if (uiText != null) uiText.text = textVal;
             }
         }
     }

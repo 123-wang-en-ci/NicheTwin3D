@@ -379,14 +379,6 @@ public class InteractionManager : MonoBehaviour
             if (HasDataLoader) UpdateVisuals(request.downloadHandler.text);
             SetInspectMode();
             lastSearchedGene = "RESET";
-
-            if (UIManager.Instance != null)
-                UIManager.Instance.ShowSystemMessage("Reset Successful", false);
-        }
-        else
-        {
-            if (UIManager.Instance != null)
-                UIManager.Instance.ShowSystemMessage("Reset Failed", true);
         }
     }
 

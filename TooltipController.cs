@@ -14,12 +14,36 @@ public class TooltipController : MonoBehaviour
     void Start()
     {
         // Make sure to hide when the game starts
-        if (tooltipObj != null) tooltipObj.SetActive(false);
+        if (tooltipObj != null)
+        {
+            tooltipObj.SetActive(false);
+
+            // Ensure tooltip NEVER blocks mouse raycasts, UI pointer events, or camera zoom/rotate
+            CanvasGroup cg = tooltipObj.GetComponent<CanvasGroup>();
+            if (cg == null) cg = tooltipObj.AddComponent<CanvasGroup>();
+            cg.blocksRaycasts = false;
+            cg.interactable = false;
+
+            foreach (var graphic in tooltipObj.GetComponentsInChildren<UnityEngine.UI.Graphic>(true))
+            {
+                graphic.raycastTarget = false;
+            }
+        }
     }
 
     void Update()
     {
-        // If comparison mode is active and mouse is on the left half, hide tooltip and return
+        // 1. If mouse is hovering over any UI panel (LeftNavPanel, RightContentSlot, buttons, etc.), hide cell ID tooltip
+        if (UnityEngine.EventSystems.EventSystem.current != null && UnityEngine.EventSystems.EventSystem.current.IsPointerOverGameObject())
+        {
+            if (tooltipObj != null && tooltipObj.activeSelf)
+            {
+                tooltipObj.SetActive(false);
+            }
+            return;
+        }
+
+        // 2. If comparison mode is active and mouse is on the left half, hide tooltip and return
         CellComparisonManager comp = FindObjectOfType<CellComparisonManager>();
         if (comp != null && comp.isComparisonMode && Input.mousePosition.x < Screen.width * 0.5f)
         {

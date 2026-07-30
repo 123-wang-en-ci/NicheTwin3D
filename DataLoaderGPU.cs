@@ -753,7 +753,6 @@ public class DataLoaderGPU : MonoBehaviour
             }
             CreateLegendPanel(legendData);
         }
-
         if (toggleSurfaceButtonObj != null)
         {
             toggleSurfaceButtonObj.SetActive(true);
@@ -764,13 +763,15 @@ public class DataLoaderGPU : MonoBehaviour
         RefreshAllCells();
     }
 
+
+
+
     private void InitRegionDropdown(List<string> names)
     {
         if (regionDropdown == null) return;
         regionDropdown.ClearOptions();
         List<string> options = new List<string> { "Show All" };
 
-        // If the backend has a name, use the name. If not, use Region 0, Region 1...
         if (names != null && names.Count > 0)
         {
             options.AddRange(names);
@@ -861,20 +862,27 @@ public class DataLoaderGPU : MonoBehaviour
         if (toggleSurfaceButtonObj != null)
         {
             bool isSurfaceOn = (gpuRenderer != null && gpuRenderer.showSurfaceMode);
+            string key = isSurfaceOn ? "BTN_SURFACE_ON" : "BTN_SURFACE_OFF";
+            string textVal = LocalizationManager.Instance != null ? LocalizationManager.Instance.GetText(key) : (isSurfaceOn ? "Surface: ON" : "Surface: OFF");
             
             TextMeshProUGUI tmpText = toggleSurfaceButtonObj.GetComponentInChildren<TextMeshProUGUI>();
             if (tmpText != null)
             {
-                tmpText.text = isSurfaceOn ? "Surface: ON" : "Surface: OFF";
+                tmpText.text = textVal;
             }
             else
             {
                 Text stdText = toggleSurfaceButtonObj.GetComponentInChildren<Text>();
                 if (stdText != null)
                 {
-                    stdText.text = isSurfaceOn ? "Surface: ON" : "Surface: OFF";
+                    stdText.text = textVal;
                 }
             }
         }
+    }
+
+    public void UpdateToggleSurfaceButtonVisuals()
+    {
+        UpdateSurfaceButtonText();
     }
 }
