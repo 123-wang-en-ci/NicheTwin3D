@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.6.0]
+
+### Added
+
+- **[Frontend] Modular left navigation and right dynamic placement slot architecture: **Newly reconstructed UI visual layout, abstracting the six core main navigation buttons on the left (gene expression interpolation, cell type annotation, regional organization semantic segmentation, zero-sample clustering, settings, help). Combined with the new `TabNavigationManager` controller and the dynamic content slot on the right (`RightContentSlot`), the secondary sub-function group on the right can be seamlessly switched and displayed when the left button is clicked.
+- **[Frontend] resident public toolbar component decoupling:** Detach system-level public keys like '[Screenshot (F12)]' and '[Reset View]' into independent resident slots ('panel_SharedCommon'), completely avoiding UI redundancy that requires repeated creation and binding across multiple subpanels; It also intelligently hides when switching to the "Settings" or "Help" panels, keeping the interface clean.
+- **[Frontend] Freely dragging and border-scaling the help window: **Added window border drag-and-retract and TitleBar drag controllers to the help document pop-up window, allowing users to freely adjust the position, width and height of the help window just like operating a standard operating system window, and the internal text maintains adaptive responsive typesetting.
+
+### Changed
+
+- **[Frontend] Help documentation refinement and precise button matching:** Overload the Chinese and English 'HelpManager' help guide, precisely mapping each operation step to the corresponding interface button and input box name (e.g., '[Enter gene...]' ', '[AI gene expression interpolation]', '[Curved Mode: Off]', '[Contrast Mode: On]'). At the same time, the actual operation order for cell type annotation and region segmentation has been corrected: "first click the button to run AI prediction, then pull down to select classification."
+- **[Frontend] Language Toggle Button Copywriting Standardization:** Unified bilingual switch button text across the entire interface is '[Chinese / English]' (CN) and '[EN / CN]' (EN), enhancing the visual appeal of prompts.
+
+### Fixed
+
+- **[Frontend] UI panel mouse hover ray penetration isolation:** Added a global 'EventSystem.IsPointerOverGameObject()' hover detection defense line to 'TooltipController', completely solving the visual conflict issue where the background 3D cell ID prompt box passes through the mouse when sliding over the left navigation bar or the right content slot.
+- **[Frontend] 3D Camera Launch Smoothing and WASD Jump Fix:** Deeply fixed issues where camera zooms in abnormally when the software starts and when pressing or releasing the WASD movement key causes the image to instantly jump upward (Jump Up). In 'CameraOrbit', the target focus initialization and full real-time Euler angle (yaw/pitch) synchronization mechanism have been reconstructed, achieving seamless and smooth alignment of coordinate systems between WASD panning, scroll wheel scaling, and right-click rotation.
+
 ## [1.5.0]
 
 ## Added
