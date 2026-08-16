@@ -161,9 +161,83 @@ public class CellComparisonManager : MonoBehaviour
         }
     }
 
+    private void EnsureComparisonLabelsExist()
+    {
+        if (beforeLabelUI != null && afterLabelUI != null) return;
+
+        Canvas mainCanvas = FindObjectOfType<Canvas>();
+        if (mainCanvas == null) return;
+
+        bool isChinese = LocalizationManager.Instance != null && 
+                         LocalizationManager.Instance.currentLanguage == Language.Chinese;
+
+        // 1. Create Left Label (Initial State / 原始基座状态)
+        if (beforeLabelUI == null)
+        {
+            GameObject labelObj = new GameObject("Before_ComparisonLabel_UI");
+            labelObj.transform.SetParent(mainCanvas.transform, false);
+            
+            RectTransform rect = labelObj.AddComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.02f, 0.93f);
+            rect.anchorMax = new Vector2(0.24f, 0.98f);
+            rect.pivot = new Vector2(0f, 1f);
+            rect.anchoredPosition = Vector2.zero;
+
+            Image bg = labelObj.AddComponent<Image>();
+            bg.color = new Color(0.05f, 0.10f, 0.18f, 0.85f);
+
+            GameObject textObj = new GameObject("Text");
+            textObj.transform.SetParent(labelObj.transform, false);
+            RectTransform textRect = textObj.AddComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.sizeDelta = Vector2.zero;
+
+            TextMeshProUGUI tmp = textObj.AddComponent<TextMeshProUGUI>();
+            tmp.text = isChinese ? "<b><color=#00FFCC>◀ 原始基座状态 (Initial State)</color></b>" : "<b><color=#00FFCC>◀ Initial State</color></b>";
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.fontSize = 16;
+
+            beforeLabelUI = labelObj;
+        }
+
+        // 2. Create Right Label (Forecast Result / AI预测结果)
+        if (afterLabelUI == null)
+        {
+            GameObject labelObj = new GameObject("After_ComparisonLabel_UI");
+            labelObj.transform.SetParent(mainCanvas.transform, false);
+            
+            RectTransform rect = labelObj.AddComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.52f, 0.93f);
+            rect.anchorMax = new Vector2(0.74f, 0.98f);
+            rect.pivot = new Vector2(0f, 1f);
+            rect.anchoredPosition = Vector2.zero;
+
+            Image bg = labelObj.AddComponent<Image>();
+            bg.color = new Color(0.05f, 0.10f, 0.18f, 0.85f);
+
+            GameObject textObj = new GameObject("Text");
+            textObj.transform.SetParent(labelObj.transform, false);
+            RectTransform textRect = textObj.AddComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.sizeDelta = Vector2.zero;
+
+            TextMeshProUGUI tmp = textObj.AddComponent<TextMeshProUGUI>();
+            tmp.text = isChinese ? "<b><color=#FFCC00>AI 预测结果 (Forecast Result) ▶</color></b>" : "<b><color=#FFCC00>Forecast Result ▶</color></b>";
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.fontSize = 16;
+
+            afterLabelUI = labelObj;
+        }
+    }
+
     void EnableComparison()
     {
         if (mainRenderer == null) return;
+
+        // Ensure dual-screen labels exist
+        EnsureComparisonLabelsExist();
 
         // Snapshot current state if none exists yet
         if (snapshotCellData == null)

@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.1]
+
+### Fixed
+
+- **[Backend] Model loading "Silent Failure Fail-Fast"**: Deeply fixed the serious flaw that when loading pre-training weights under a custom data set (non-default 32,101 genes), an exception is thrown by PyTorch due to a mismatch in the Embedding layer dimension, but the system forcibly continues and outputs the disguise success. An explicit `sys.exit(1)` interception has been added to `model_engine.py`. Once a Size Mismatch is detected, the service will be immediately interrupted and an intuitive error will be thrown to the console.
+- **[Backend] Pre-training vocabulary destructive coverage repair**: Cancel the logic of violently overwriting the system global `gene_vocab.npy` when a discrepancy in the number of custom H5AD genes is detected. Now the system will only apply the gene list of the current data set in memory, completely protecting the original pre-trained model weight vocabulary from being contaminated.
+
 ## [1.6.0]
 
 ### Added

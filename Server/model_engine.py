@@ -141,10 +141,8 @@ class NicheformerEngine:
                 print("Found gene_vocab.npy, loading fixed vocabulary...")
                 self.gene_list = loaded_vocab
             else:
-                print(f"gene_vocab.npy has {len(loaded_vocab)} genes, but the current data has {self.adata.n_vars}, automatically update the vocabulary...")
+                print(f"gene_vocab.npy has {len(loaded_vocab)} genes, but the current data has {self.adata.n_vars}, using current data's genes without overwriting vocab...")
                 self.gene_list = self.adata.var_names.tolist()
-                np.save(vocab_path, self.gene_list)
-                print(f"gene_vocab.npy updated to {len(self.gene_list)} genes")
         else:
             self.gene_list = self.adata.var_names.tolist()
             vocab_path2 = os.path.join(current_dir, "gene_vocab.npy")
@@ -191,12 +189,15 @@ class NicheformerEngine:
             self.model.load_state_dict(new_state_dict, strict=False)
             print("Model loaded successfully.")
             
-        except Exception as e:
-            print(f"Error loading weights: {e}")
-        finally:
             self.model.to(self.device)
             self.model.eval()
             self._precompute_embeddings()
+            
+        except Exception as e:
+            print(f"[Fatal Error] 尺寸不匹配或权重损坏 (Size Mismatch): {e}")
+            print("模型将停止运行以避免生成错误的分析结果。")
+            import sys
+            sys.exit(1)
 
     def _get_batch_tokens(self, cell_indices_batch):
         """Construct model input and aggregate neighbor gene expression"""
@@ -245,22 +246,17 @@ class NicheformerEngine:
 
     def _precompute_embeddings(self):
         """Compute and cache embeddings for all cells"""
-        cache_filename = "embeddings_cache.npy"
+        import hashlib
+        data_hash_str = "".join(self.adata.var_names.tolist()) + str(self.adata.n_obs)
+        data_hash = hashlib.md5(data_hash_str.encode()).hexdigest()
+        
+        cache_filename = f"embeddings_cache_{data_hash}.npy"
         cache_path = os.path.join(current_dir, cache_filename)
         model_path = os.path.join(current_dir, "nicheformer_weights.pth")
 
-        # Check if cache exists and is newer than model weights (prevents using old cache with new model)
         use_cache = True
-        # if os.path.exists(cache_path):
-        #     if os.path.exists(model_path):
-        #         if os.path.getmtime(cache_path) > os.path.getmtime(model_path):
-        #             use_cache = True
-        #         else:
-        #             print("[Cache] 发现新版本模型权重，旧的特征缓存已作废，准备重新计算...")
-        #     else:
-        #         use_cache = True
 
-        if use_cache:
+        if use_cache and os.path.exists(cache_path):
             print(f"[Cache] Found valid cached embeddings, loading...")
             try:
                 self.embeddings_cache = np.load(cache_path)

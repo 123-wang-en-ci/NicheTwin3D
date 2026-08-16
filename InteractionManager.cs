@@ -426,14 +426,61 @@ public class InteractionManager : MonoBehaviour
 
     private System.Collections.IEnumerator CaptureScreenshotWithoutUI()
     {
-        // 1. Find all the Canvas and hide it for now
-        Canvas[] canvases = FindObjectsOfType<Canvas>();
-        bool[] canvasStates = new bool[canvases.Length];
+        // 1. Identify comparison labels to preserve if comparison mode is active
+        GameObject beforeLabel = null;
+        GameObject afterLabel = null;
+        CellComparisonManager comp = CellComparisonManager.Instance != null ? CellComparisonManager.Instance : FindObjectOfType<CellComparisonManager>();
+        
+        if (comp != null && comp.isComparisonMode)
+        {
+            beforeLabel = comp.beforeLabelUI;
+            afterLabel = comp.afterLabelUI;
+        }
+
+        Canvas[] canvases = FindObjectsOfType<Canvas>(true);
+        List<Canvas> disabledCanvases = new List<Canvas>();
+        List<GameObject> hiddenChildren = new List<GameObject>();
+
         for (int i = 0; i < canvases.Length; i++)
         {
-            canvasStates[i] = canvases[i].enabled;
-            canvases[i].enabled = false;
+            Canvas canvas = canvases[i];
+            if (!canvas.enabled) continue;
+
+            // Check if this canvas contains comparison labels
+            bool isLabelCanvas = false;
+            if (beforeLabel != null && beforeLabel.transform.IsChildOf(canvas.transform)) isLabelCanvas = true;
+            if (afterLabel != null && afterLabel.transform.IsChildOf(canvas.transform)) isLabelCanvas = true;
+
+            if (!isLabelCanvas)
+            {
+                // Disabling canvases that do not contain comparison labels
+                canvas.enabled = false;
+                disabledCanvases.Add(canvas);
+            }
+            else
+            {
+                // For the canvas containing comparison labels, keep canvas enabled, but hide all other children
+                for (int c = 0; c < canvas.transform.childCount; c++)
+                {
+                    Transform child = canvas.transform.GetChild(c);
+                    if (!child.gameObject.activeSelf) continue;
+
+                    bool isLabelChild = false;
+                    if (beforeLabel != null && (child.gameObject == beforeLabel || beforeLabel.transform.IsChildOf(child))) isLabelChild = true;
+                    if (afterLabel != null && (child.gameObject == afterLabel || afterLabel.transform.IsChildOf(child))) isLabelChild = true;
+
+                    if (!isLabelChild)
+                    {
+                        child.gameObject.SetActive(false);
+                        hiddenChildren.Add(child.gameObject);
+                    }
+                }
+            }
         }
+
+        // Ensure comparison labels stay active
+        if (beforeLabel != null && comp.isComparisonMode) beforeLabel.SetActive(true);
+        if (afterLabel != null && comp.isComparisonMode) afterLabel.SetActive(true);
 
         // 2. Wait for all cameras and frames to be rendered for this frame
         yield return new WaitForEndOfFrame();
@@ -458,10 +505,14 @@ public class InteractionManager : MonoBehaviour
         Destroy(screenShot); 
         System.IO.File.WriteAllBytes(savePath, bytes);
 
-        // 4. Restore Canvas display
-        for (int i = 0; i < canvases.Length; i++)
+        // 4. Restore hidden UI elements & canvases
+        foreach (GameObject obj in hiddenChildren)
         {
-            canvases[i].enabled = canvasStates[i];
+            if (obj != null) obj.SetActive(true);
+        }
+        foreach (Canvas canvas in disabledCanvases)
+        {
+            if (canvas != null) canvas.enabled = true;
         }
 
         // 5. Prompt the user (the UI has been restored at this time and the prompt can be displayed normally)
@@ -469,7 +520,7 @@ public class InteractionManager : MonoBehaviour
         {
             UIManager.Instance.ShowSystemMessage($"Image exported: {filename}", false);
         }
-        Debug.Log($"[InteractionManager] Screenshot saved without UI: {savePath}");
+        Debug.Log($"[InteractionManager] Screenshot saved with comparison labels: {savePath}");
     }
 
     void HandleClick()

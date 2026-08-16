@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from fastapi.responses import JSONResponse
 import uvicorn
 from fastapi import FastAPI, HTTPException
@@ -23,38 +24,30 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--output_dir", type=str, default="", help="Absolute path of Unity packaged StreamingAssets")
 args, _ = parser.parse_known_args()
 
-
 H5AD_FILENAME = "Allen2022Molecular_lps_MsBrainAgingSpatialDonor_14_1.h5ad" 
+# H5AD_FILENAME = "Fang2022Conservation_H19.30.001.STG.4000.expand.rep2.h5ad" 
+# H5AD_FILENAME = "Allen2022Molecular_lps_MsBrainAgingSpatialDonor_14_1 鏃?h5ad" 
 # H5AD_FILENAME = "train.h5ad" 
 # H5AD_FILENAME = "data.h5ad" 
 CSV_FILENAME = "unity_cell_data.csv"
 CELL_TYPE_COLUMN = "cell_type" 
-
-
 NICHEFORMER_MODEL_PATH = "nicheformer_weights.pth" 
-
 app = FastAPI()
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
 class GeneRequest(BaseModel):
     gene_name: str
     use_imputation: bool = False 
-
 class PerturbRequest(BaseModel):
     target_id: str
     perturb_type: str = "KO"
     target_gene: str = "ENSMUSG00000037010"
-
 class ClusteringRequest(BaseModel):
     n_clusters: int = 10
-
 # Data management class (logical core)
 class DataManager:
     def __init__(self):
@@ -106,8 +99,7 @@ class DataManager:
         if target_debug_id in self.adata.var_names:
             print(f"Target gene {target_debug_id} exists in the index!")
         else:
-            print(f"Target gene {target_debug_id} does not exist in the index!")
-            
+            # print(f"Target gene {target_debug_id} does not exist in the index!")
             # 3. Try to find it in other columns (sometimes ID is hidden in a column of var)
             found_in_col = False
             for col in self.adata.var.columns:
@@ -129,8 +121,8 @@ class DataManager:
         self.ai_engine.adata = self.adata
         self.ai_engine.gene_list = self.adata.var_names.tolist()
         
-        # Variable names must be gene_to_id, and the ID offset must match model_engine (i + 3)
-        self.ai_engine.gene_to_id = {name: i + 3 for i, name in enumerate(self.ai_engine.gene_list)}
+        # Variable names must be gene_to_id, and the ID offset must match model_engine (i + 8)
+        self.ai_engine.gene_to_id = {name: i + 8 for i, name in enumerate(self.ai_engine.gene_list)}
         
         # Print to verify injection success
         print(f"[Debugging] Engine mapping table built, containing {len(self.ai_engine.gene_to_id)} genes.")
@@ -172,7 +164,9 @@ class DataManager:
                 self.ai_engine.load_model(self.model_path)
                 print("[System] Nicheformer weights loaded successfully.")
             except Exception as e:
-                print(f"[Warning] Failed to load Nicheformer weights: {e}")
+                print(f"[Error] Failed to load Nicheformer weights (Size Mismatch or Corrupted Checkpoint): {e}")
+                import sys
+                sys.exit("Fatal Error: State_dict size mismatch.")
         else:
             print(f"[Warning] Weight file not found: {self.model_path}, will use untrained model for testing.")
 
